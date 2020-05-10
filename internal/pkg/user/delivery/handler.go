@@ -44,10 +44,16 @@ func (uh UserHandler) Create(w http.ResponseWriter, r *http.Request) {
 	if dbUser != nil {
 		log.Print("user with same data is already exists")
 		w.WriteHeader(http.StatusConflict)
-		userModel = *dbUser
-	} else {
-		w.WriteHeader(http.StatusCreated)
+
+		if err := json.NewEncoder(w).Encode(dbUser); err != nil {
+			log.Print(err)
+			http.Error(w, "failed to encode user to json", http.StatusInternalServerError)
+			return
+		}
+		return
 	}
+
+	w.WriteHeader(http.StatusCreated)
 
 	if err := json.NewEncoder(w).Encode(userModel); err != nil {
 		log.Print(err)
@@ -67,15 +73,15 @@ func (uh UserHandler) Find(w http.ResponseWriter, r *http.Request) {
 	userModel := models.User{Nickname: nick}
 
 	dbUser, err := uh.UserUC.Find(userModel)
+
+	if err == models.UserNotFound {
+		log.Print("user not found")
+		http.Error(w, "can't find user with nickname: "+nick, http.StatusNotFound)
+		return
+	}
 	if err != nil {
 		log.Print(err)
 		http.Error(w, "failed to find user", http.StatusInternalServerError)
-		return
-	}
-
-	if dbUser == nil {
-		log.Print("user not found")
-		http.Error(w, "can't find user with nickname: "+nick, http.StatusNotFound)
 		return
 	}
 

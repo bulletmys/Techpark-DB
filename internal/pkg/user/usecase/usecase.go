@@ -11,7 +11,7 @@ type UserUC struct {
 }
 
 //Возможно стоит сделать проверку на существование и создание юзера в рамках одной транзакции
-func (uc UserUC) Create(user models.User) (*models.User, error) {
+func (uc UserUC) Create(user models.User) ([]models.User, error) {
 	dbUser, err := uc.UserRepo.FindUser(user)
 	if err != nil {
 		return nil, fmt.Errorf("failed to check users existing: %v", err)
@@ -24,9 +24,12 @@ func (uc UserUC) Create(user models.User) (*models.User, error) {
 
 //Можно в качестве аргумента принимать структуру и в нее же записывать результат
 func (uc UserUC) Find(user models.User) (*models.User, error) {
-	dbUser, err := uc.UserRepo.FindUser(user)
+	dbUser, err := uc.UserRepo.FindUserByNickname(user.Nickname)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find user in db: %v", err)
+	}
+	if dbUser == nil {
+		return nil, models.UserNotFound
 	}
 	return dbUser, nil
 }
@@ -39,7 +42,7 @@ func (uc UserUC) Update(user models.User) (*models.User, error) {
 		}
 	}
 
-	dbUser, err := uc.UserRepo.FindUser(user)
+	dbUser, err := uc.UserRepo.FindUserByNickname(user.Nickname)
 	if err != nil {
 		return nil, err
 	}

@@ -16,13 +16,12 @@ func newDBRepository(conn *pgx.Conn) *DBRepository {
 	return &DBRepository{Conn: conn}
 }
 
-func (db DBRepository) FindUser(user models.User) (*models.User, error) {
+func (db DBRepository) FindUserByNickname(nick string) (*models.User, error) {
 	var userModel models.User
 
 	err := db.Conn.QueryRow(context.Background(),
-		"select nick, name, email, about from users where lower(nick) = $1 or lower(email) = $2",
-		strings.ToLower(user.Nickname),
-		strings.ToLower(user.Email),
+		"select nick, name, email, about from users where lower(nick) = $1",
+		strings.ToLower(nick),
 	).Scan(&userModel.Nickname, &userModel.FullName, &userModel.Email, &userModel.About)
 
 	if err == pgx.ErrNoRows {
@@ -30,6 +29,34 @@ func (db DBRepository) FindUser(user models.User) (*models.User, error) {
 	}
 
 	return &userModel, err
+}
+
+func (db DBRepository) FindUser(user models.User) ([]models.User, error) {
+
+	rows, err := db.Conn.Query(context.Background(),
+		"select nick, name, email, about from users where lower(nick) = $1 or lower(email) = $2",
+		strings.ToLower(user.Nickname),
+		strings.ToLower(user.Email),
+	)
+
+	if err == pgx.ErrNoRows {
+		return nil, nil
+	}
+
+	defer rows.Close()
+
+	users := make([]models.User, 0, 2)
+
+	//noinspection GoNilness
+	for rows.Next() {
+		userModel := models.User{}
+		if err := rows.Scan(&userModel.Nickname, &userModel.FullName, &userModel.Email, &userModel.About); err != nil {
+			return nil, err
+		}
+		users = append(users, userModel)
+	}
+
+	return users, err
 }
 
 func (db DBRepository) Create(user models.User) error {

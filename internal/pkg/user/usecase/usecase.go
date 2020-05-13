@@ -58,6 +58,7 @@ func (uc UserUC) Update(user models.User) (*models.User, error) {
 	return dbUser, nil
 }
 
+
 func MergeModels(dbUser *models.User, updatedUser models.User) {
 	if updatedUser.FullName != "" {
 		dbUser.FullName = updatedUser.FullName

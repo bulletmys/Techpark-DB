@@ -5,12 +5,15 @@ import (
 	"github.com/gorilla/mux"
 	"log"
 	"net/http"
+	"strconv"
+	"techpark_db/internal/pkg/forum"
 	"techpark_db/internal/pkg/forum/usecase"
+	"techpark_db/internal/pkg/helpers"
 	"techpark_db/internal/pkg/models"
 )
 
 type ForumHandler struct {
-	ForumUC usecase.ForumUC
+	ForumUC forum.UseCase
 }
 
 func NewForumHandler(uc usecase.ForumUC) *ForumHandler {
@@ -26,13 +29,17 @@ func (uh ForumHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	forum, err := uh.ForumUC.Create(forumModel)
+
+	w.Header().Set("Content-Type", "application/json")
+
 	switch err {
 	case models.SameForumExists:
 		log.Print(err)
 		w.WriteHeader(http.StatusConflict)
 	case models.UserNotFound:
 		log.Print(err)
-		http.Error(w, err.Error(), http.StatusNotFound)
+		w.WriteHeader(http.StatusNotFound)
+		helpers.EncodeAndSend(models.Message{Msg: err.Error()}, w)
 		return
 	case nil:
 		w.WriteHeader(http.StatusCreated)
@@ -42,15 +49,12 @@ func (uh ForumHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-
 	if err := json.NewEncoder(w).Encode(forum); err != nil {
 		log.Print(err)
 		http.Error(w, "failed to encode user to json", http.StatusInternalServerError)
 		return
 	}
 }
-
 
 func (uh ForumHandler) Find(w http.ResponseWriter, r *http.Request) {
 	slug, ok := mux.Vars(r)["slug"]
@@ -61,15 +65,56 @@ func (uh ForumHandler) Find(w http.ResponseWriter, r *http.Request) {
 	}
 
 	forum, err := uh.ForumUC.Find(slug)
-	if err == models.ForumNotFound {
-		log.Print(err)
-		http.Error(w, "форум не найден", http.StatusNotFound)
-		return
-	}
 
 	w.Header().Set("Content-Type", "application/json")
 
+	if err == models.ForumNotFound {
+		log.Print(err)
+		w.WriteHeader(http.StatusNotFound)
+		helpers.EncodeAndSend(models.Message{Msg: err.Error()}, w)
+		return
+	}
+
 	if err := json.NewEncoder(w).Encode(forum); err != nil {
+		log.Print(err)
+		http.Error(w, "failed to encode user to json", http.StatusInternalServerError)
+		return
+	}
+}
+
+
+func (uh ForumHandler) GetForumUsers(w http.ResponseWriter, r *http.Request) {
+	slug, ok := mux.Vars(r)["slug"]
+	if !ok {
+		log.Print("no mux vars")
+		http.Error(w, "no slug field found", http.StatusBadRequest)
+		return
+	}
+
+	limit, err := strconv.Atoi(r.URL.Query().Get("limit"))
+	if err != nil {
+		limit = 0
+	}
+
+	since := r.URL.Query().Get("since")
+
+	desc, err := strconv.ParseBool(r.URL.Query().Get("desc"))
+	if err != nil {
+		desc = false
+	}
+
+	dbUsers, err := uh.ForumUC.GetForumUsers(slug, since, limit, desc)
+
+	w.Header().Set("Content-Type", "application/json")
+
+	if err == models.ForumNotFound {
+		log.Print(err)
+		w.WriteHeader(http.StatusNotFound)
+		helpers.EncodeAndSend(models.Message{Msg: err.Error()}, w)
+		return
+	}
+
+	if err := json.NewEncoder(w).Encode(dbUsers); err != nil {
 		log.Print(err)
 		http.Error(w, "failed to encode user to json", http.StatusInternalServerError)
 		return

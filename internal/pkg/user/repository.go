@@ -8,4 +8,5 @@ type Repository interface {
 	UpdateUser(user models.User) error
 	FindUserByEmail(email string) (*models.User, error)
 	FindUserByNickname(nick string) (*models.User, error)
+	GetForumUsers(slug, since string, limit int, desc bool) ([]models.User, error)
 }

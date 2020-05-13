@@ -5,6 +5,7 @@ import (
 	"github.com/gorilla/mux"
 	"log"
 	"net/http"
+	"techpark_db/internal/pkg/helpers"
 	"techpark_db/internal/pkg/models"
 	"techpark_db/internal/pkg/user"
 )
@@ -74,9 +75,12 @@ func (uh UserHandler) Find(w http.ResponseWriter, r *http.Request) {
 
 	dbUser, err := uh.UserUC.Find(userModel)
 
+	w.Header().Set("Content-Type", "application/json")
+
 	if err == models.UserNotFound {
 		log.Print("user not found")
-		http.Error(w, "can't find user with nickname: "+nick, http.StatusNotFound)
+		w.WriteHeader(http.StatusNotFound)
+		helpers.EncodeAndSend(models.Message{Msg: "can't find user with nickname: " + nick}, w)
 		return
 	}
 	if err != nil {
@@ -84,8 +88,6 @@ func (uh UserHandler) Find(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "failed to find user", http.StatusInternalServerError)
 		return
 	}
-
-	w.Header().Set("Content-Type", "application/json")
 
 	if err := json.NewEncoder(w).Encode(dbUser); err != nil {
 		log.Print(err)
@@ -111,14 +113,18 @@ func (uh UserHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 	dbUser, err := uh.UserUC.Update(userModel)
 
+	w.Header().Set("Content-Type", "application/json")
+
 	switch err {
 	case models.SameUserExists:
 		log.Print(err)
-		http.Error(w, err.Error(), http.StatusConflict)
+		w.WriteHeader(http.StatusConflict)
+		helpers.EncodeAndSend(models.Message{Msg: err.Error()}, w)
 		return
 	case models.UserNotFound:
 		log.Println(err)
-		http.Error(w, err.Error(), http.StatusNotFound)
+		w.WriteHeader(http.StatusNotFound)
+		helpers.EncodeAndSend(models.Message{Msg: err.Error()}, w)
 		return
 	case nil:
 		break

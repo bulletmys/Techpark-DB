@@ -20,6 +20,8 @@ func (uc ForumUC) Create(forum models.Forum) (*models.Forum, error) {
 		return nil, models.UserNotFound
 	}
 
+	forum.User = dbUser.Nickname
+
 	dbForum, err := uc.ForumRepo.FindForumBySlug(forum.Slug)
 	if err != nil {
 		return nil, err
@@ -29,6 +31,17 @@ func (uc ForumUC) Create(forum models.Forum) (*models.Forum, error) {
 	}
 
 	return &forum, uc.ForumRepo.Create(forum)
+}
+
+func (uc ForumUC) GetForumUsers(slug, since string, limit int, desc bool) ([]models.User, error) {
+	dbForum, err := uc.ForumRepo.FindForumBySlug(slug)
+	if err != nil {
+		return nil, err
+	}
+	if dbForum == nil {
+		return nil, models.ForumNotFound
+	}
+	return uc.UserRepo.GetForumUsers(slug, since, limit, desc)
 }
 
 func (uc ForumUC) Find(slug string) (*models.Forum, error) {

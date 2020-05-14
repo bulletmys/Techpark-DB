@@ -34,7 +34,7 @@ func StartNew() {
 		WriteTimeout: 10 * time.Second,
 	}
 
-	conn, err := pgxpool.Connect(context.Background(), "host=localhost port=5432 user=postgres password=postgres dbname=db_forum")
+	conn, err := pgxpool.Connect(context.Background(), "host=localhost port=5432 user=docker password=docker dbname=docker")
 	//conn, err := pgxpool.Poolect(context.Background(), os.Getenv("DATABASE_URL"))
 	if err != nil {
 		log.Fatalf("failed to connecto to db: %v", err)

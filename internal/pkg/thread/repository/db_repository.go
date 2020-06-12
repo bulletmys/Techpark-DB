@@ -127,7 +127,7 @@ func (db DBRepository) FindBySlugOrID(slug string, id int32) (*models.Thread, er
 	var thread models.Thread
 
 	err := db.Conn.QueryRow(
-		"select nick, created, forum, id, message, slug, title, votes from threads where id = $1 or lower(slug) = $2",
+		"select nick, created, forum, id, message, slug, title, votes from threads where id = $1 or slug = $2",
 		id,
 		strings.ToLower(slug),
 	).Scan(
@@ -143,9 +143,9 @@ func (db DBRepository) FindBySlugOrID(slug string, id int32) (*models.Thread, er
 	if err == pgx.ErrNoRows {
 		return nil, nil
 	}
-	if err != nil {
-		return nil, err
-	}
+	//if err != nil {
+	//	return nil, err
+	//}
 	return &thread, nil
 }
 
@@ -224,7 +224,7 @@ func (db DBRepository) Vote(vote models.Vote, thread *models.Thread) error {
 		userVoice = true
 	}
 	var userVote bool
-	queryCheck := "select vote from votes where lower(nick) = $1 and thread = $2"
+	queryCheck := "select vote from votes where nick = $1 and thread = $2"
 
 	err := db.Conn.QueryRow(
 		queryCheck,

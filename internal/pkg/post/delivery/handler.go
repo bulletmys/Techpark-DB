@@ -2,7 +2,6 @@ package delivery
 
 import (
 	"encoding/json"
-	"fmt"
 	"github.com/gorilla/mux"
 	"log"
 	"net/http"
@@ -166,7 +165,6 @@ func (uh PostHandler) GetDetails(w http.ResponseWriter, r *http.Request) {
 	}
 
 	for _, elem := range related {
-		fmt.Println(elem)
 		switch elem {
 		case "user":
 			userFlag = true

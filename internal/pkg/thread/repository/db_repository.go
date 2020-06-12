@@ -275,8 +275,6 @@ func (db DBRepository) Vote(vote models.Vote, thread *models.Thread) error {
 		thread.ID,
 	).Scan(&userVote)
 
-	fmt.Println(userVote, userVoice)
-
 	if err == nil && userVote == userVoice {
 		return nil
 	}

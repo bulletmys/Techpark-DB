@@ -1,37 +1,32 @@
 package repository
 
 import (
-	"context"
 	"fmt"
-	"github.com/jackc/pgx/v4"
-	"github.com/jackc/pgx/v4/pgxpool"
+	pgx2 "github.com/jackc/pgx"
+	"log"
 	"strconv"
 	"strings"
 	"techpark_db/internal/pkg/models"
 )
 
 type DBRepository struct {
-	Conn *pgxpool.Pool
+	Conn *pgx2.ConnPool
 }
 
-func newDBRepository(conn *pgxpool.Pool) *DBRepository {
+func newDBRepository(conn *pgx2.ConnPool) *DBRepository {
 	return &DBRepository{Conn: conn}
 }
 
 func (db DBRepository) FindUserByNickname(nick string) (*models.User, error) {
-	conn, err := db.Conn.Acquire(context.Background())
-	if err != nil {
-		return nil, fmt.Errorf("failed to acquire conn: %v", err)
-	}
-	defer conn.Release()
+
 	var userModel models.User
 
-	err = conn.QueryRow(context.Background(),
+	err := db.Conn.QueryRow(
 		"select nick, name, email, about from users where lower(nick) = $1",
 		strings.ToLower(nick),
 	).Scan(&userModel.Nickname, &userModel.FullName, &userModel.Email, &userModel.About)
 
-	if err == pgx.ErrNoRows {
+	if err == pgx2.ErrNoRows {
 		return nil, nil
 	}
 
@@ -39,19 +34,14 @@ func (db DBRepository) FindUserByNickname(nick string) (*models.User, error) {
 }
 
 func (db DBRepository) FindUser(user models.User) ([]models.User, error) {
-	conn, err := db.Conn.Acquire(context.Background())
-	if err != nil {
-		return nil, fmt.Errorf("failed to acquire conn: %v", err)
-	}
-	defer conn.Release()
 
-	rows, err := conn.Query(context.Background(),
-		"select nick, name, email, about from users where lower(nick) = $1 or lower(email) = $2",
+	rows, err := db.Conn.Query(
+		"select nick, name, email, about from users where nick = $1 or email = $2",
 		strings.ToLower(user.Nickname),
 		strings.ToLower(user.Email),
 	)
 
-	if err == pgx.ErrNoRows {
+	if err == pgx2.ErrNoRows {
 		return nil, nil
 	}
 
@@ -82,13 +72,9 @@ func (db DBRepository) FindUser(user models.User) ([]models.User, error) {
 }
 
 func (db DBRepository) Create(user models.User) error {
-	conn, err := db.Conn.Acquire(context.Background())
-	if err != nil {
-		return fmt.Errorf("failed to acquire conn: %v", err)
-	}
-	defer conn.Release()
 
-	_, err = conn.Exec(context.Background(),
+
+	_, err := db.Conn.Exec(
 		"insert into users(nick, name, email, about) values($1, $2, $3, $4)",
 		user.Nickname,
 		user.FullName,
@@ -103,34 +89,27 @@ func (db DBRepository) Create(user models.User) error {
 }
 
 func (db DBRepository) FindUserByEmail(email string) (*models.User, error) {
-	conn, err := db.Conn.Acquire(context.Background())
-	if err != nil {
-		return nil, fmt.Errorf("failed to acquire conn: %v", err)
-	}
-	defer conn.Release()
+
 
 	var userModel models.User
 
-	err = conn.QueryRow(context.Background(),
+	err := db.Conn.QueryRow(
 		"select nick, name, email, about from users where lower(email) = $1",
 		strings.ToLower(email),
 	).Scan(&userModel.Nickname, &userModel.FullName, &userModel.Email, &userModel.About)
 
-	if err == pgx.ErrNoRows {
+	if err == pgx2.ErrNoRows {
 		return nil, nil
 	}
+
+	log.Println("ErrorDB:", err)
 
 	return &userModel, err
 }
 
 func (db DBRepository) UpdateUser(user models.User) error {
-	conn, err := db.Conn.Acquire(context.Background())
-	if err != nil {
-		return fmt.Errorf("failed to acquire conn: %v", err)
-	}
-	defer conn.Release()
 
-	_, err = conn.Exec(context.Background(),
+	_, err := db.Conn.Exec(
 		"update users set name = $1, email = $2, about = $3 where lower(nick) = $4",
 		user.FullName,
 		user.Email,
@@ -142,11 +121,7 @@ func (db DBRepository) UpdateUser(user models.User) error {
 }
 
 func (db DBRepository) GetForumUsers(slug, since string, limit int, desc bool) ([]models.User, error) {
-	conn, err := db.Conn.Acquire(context.Background())
-	if err != nil {
-		return nil, fmt.Errorf("failed to acquire conn: %v", err)
-	}
-	defer conn.Release()
+
 
 	args := make([]interface{}, 1)
 	args[0] = strings.ToLower(slug)
@@ -177,7 +152,7 @@ func (db DBRepository) GetForumUsers(slug, since string, limit int, desc bool) (
 		query += "limit " + strconv.Itoa(limit)
 	}
 
-	rows, err := conn.Query(context.Background(),
+	rows, err := db.Conn.Query(
 		query,
 		args...
 	)

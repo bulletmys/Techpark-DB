@@ -1,9 +1,7 @@
 package repository
 
 import (
-	"context"
-	"fmt"
-	"github.com/jackc/pgx/v4/pgxpool"
+	"github.com/jackc/pgx"
 	"techpark_db/internal/pkg/models"
 )
 
@@ -13,26 +11,20 @@ type Repository interface {
 }
 
 type DBServiceRepository struct {
-	Conn *pgxpool.Pool
+	Conn *pgx.ConnPool
 }
 
-func NewDBServiceRepository(conn *pgxpool.Pool) *DBServiceRepository {
+func NewDBServiceRepository(conn *pgx.ConnPool) *DBServiceRepository {
 	return &DBServiceRepository{Conn: conn}
 }
 
 func (db DBServiceRepository) Status() (*models.Status, error) {
-	conn, err := db.Conn.Acquire(context.Background())
-	if err != nil {
-		return nil, fmt.Errorf("failed to acquire conn: %v", err)
-	}
-	defer conn.Release()
-
 	var forums, posts, threads, users int64
 
-	conn.QueryRow(context.Background(), "select count(*) from forums").Scan(&forums)
-	conn.QueryRow(context.Background(), "select count(*) from posts").Scan(&posts)
-	conn.QueryRow(context.Background(), "select count(*) from threads").Scan(&threads)
-	conn.QueryRow(context.Background(), "select count(*) from users").Scan(&users)
+	db.Conn.QueryRow("select count(*) from forums").Scan(&forums)
+	db.Conn.QueryRow("select count(*) from posts").Scan(&posts)
+	db.Conn.QueryRow("select count(*) from threads").Scan(&threads)
+	db.Conn.QueryRow("select count(*) from users").Scan(&users)
 
 	return &models.Status{
 		Forums:  forums,
@@ -43,14 +35,8 @@ func (db DBServiceRepository) Status() (*models.Status, error) {
 }
 
 func (db DBServiceRepository) Clear() error {
-	conn, err := db.Conn.Acquire(context.Background())
-	if err != nil {
-		return fmt.Errorf("failed to acquire conn: %v", err)
-	}
-	defer conn.Release()
-
 	query := "truncate table votes RESTART IDENTITY cascade;truncate table posts RESTART IDENTITY cascade ;truncate table forums RESTART IDENTITY cascade ;truncate table threads RESTART IDENTITY cascade ;truncate table users RESTART IDENTITY cascade ;"
 
-	_, err = conn.Exec(context.Background(), query)
+	_, err := db.Conn.Exec(query)
 	return err
 }

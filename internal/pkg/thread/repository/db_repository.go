@@ -1,10 +1,8 @@
 package repository
 
 import (
-	"context"
 	"fmt"
-	"github.com/jackc/pgx/v4"
-	"github.com/jackc/pgx/v4/pgxpool"
+	"github.com/jackc/pgx"
 	"strconv"
 	"strings"
 	"techpark_db/internal/pkg/models"
@@ -12,20 +10,14 @@ import (
 )
 
 type DBRepository struct {
-	Conn *pgxpool.Pool
+	Conn *pgx.ConnPool
 }
 
-func newDBRepository(conn *pgxpool.Pool) *DBRepository {
+func newDBRepository(conn *pgx.ConnPool) *DBRepository {
 	return &DBRepository{Conn: conn}
 }
 
 func (db DBRepository) Create(thread models.Thread) (int32, error) {
-	conn, err := db.Conn.Acquire(context.Background())
-	if err != nil {
-		return 0, fmt.Errorf("failed to acquire conn: %v", err)
-	}
-	defer conn.Release()
-
 	var id int32
 
 	fields := make([]interface{}, 0)
@@ -50,7 +42,7 @@ func (db DBRepository) Create(thread models.Thread) (int32, error) {
 
 	query := fmt.Sprintf("insert into threads(%s) values(%s) RETURNING id", queryParams, queryValues)
 
-	err = conn.QueryRow(context.Background(),
+	err := db.Conn.QueryRow(
 		query,
 		fields...
 	).Scan(&id)
@@ -62,15 +54,9 @@ func (db DBRepository) Create(thread models.Thread) (int32, error) {
 }
 
 func (db DBRepository) FindThreadBySlug(slug string) (*models.Thread, error) {
-	conn, err := db.Conn.Acquire(context.Background())
-	if err != nil {
-		return nil, fmt.Errorf("failed to acquire conn: %v", err)
-	}
-	defer conn.Release()
-
 	var thread models.Thread
 
-	err = conn.QueryRow(context.Background(),
+	err := db.Conn.QueryRow(
 		"select nick, created, forum, id, message, slug, title, votes from threads where lower(slug) = $1",
 		strings.ToLower(slug),
 	).Scan(
@@ -96,15 +82,9 @@ func (db DBRepository) FindThreadBySlug(slug string) (*models.Thread, error) {
 }
 
 func (db DBRepository) FindThreadByID(id int32) (*models.Thread, error) {
-	conn, err := db.Conn.Acquire(context.Background())
-	if err != nil {
-		return nil, fmt.Errorf("failed to acquire conn: %v", err)
-	}
-	defer conn.Release()
-
 	var thread models.Thread
 
-	err = conn.QueryRow(context.Background(),
+	err := db.Conn.QueryRow(
 		"select nick, created, forum, id, message, slug, title, votes from threads where id = $1",
 		id,
 	).Scan(
@@ -130,14 +110,9 @@ func (db DBRepository) FindThreadByID(id int32) (*models.Thread, error) {
 }
 
 func (db DBRepository) FindAndGetID(slug string, id int32) (int32, string) {
-	conn, err := db.Conn.Acquire(context.Background())
-	if err != nil {
-		return -1, ""
-	}
-	defer conn.Release()
 
 	var forum string
-	err = conn.QueryRow(context.Background(),
+	err := db.Conn.QueryRow(
 		"select id, forum from threads where lower(slug) = $1 or id = $2",
 		strings.ToLower(slug),
 		id,
@@ -149,15 +124,9 @@ func (db DBRepository) FindAndGetID(slug string, id int32) (int32, string) {
 }
 
 func (db DBRepository) FindBySlugOrID(slug string, id int32) (*models.Thread, error) {
-	conn, err := db.Conn.Acquire(context.Background())
-	if err != nil {
-		return nil, fmt.Errorf("failed to acquire conn: %v", err)
-	}
-	defer conn.Release()
-
 	var thread models.Thread
 
-	err = conn.QueryRow(context.Background(),
+	err := db.Conn.QueryRow(
 		"select nick, created, forum, id, message, slug, title, votes from threads where id = $1 or lower(slug) = $2",
 		id,
 		strings.ToLower(slug),
@@ -181,12 +150,6 @@ func (db DBRepository) FindBySlugOrID(slug string, id int32) (*models.Thread, er
 }
 
 func (db DBRepository) GetThreadsByForum(forumSlug string, limit int, since time.Time, desc bool) ([]models.Thread, error) {
-	conn, err := db.Conn.Acquire(context.Background())
-	if err != nil {
-		return nil, fmt.Errorf("failed to acquire conn: %v", err)
-	}
-	defer conn.Release()
-
 	flag := false
 	query := getThreadsQueryConfigurator(limit, since, desc, &flag)
 
@@ -196,7 +159,7 @@ func (db DBRepository) GetThreadsByForum(forumSlug string, limit int, since time
 	if flag {
 		args = append(args, since)
 	}
-	rows, err := conn.Query(context.Background(),
+	rows, err := db.Conn.Query(
 		query,
 		args...
 	)
@@ -256,12 +219,6 @@ func getThreadsQueryConfigurator(limit int, since time.Time, desc bool, flag *bo
 }
 
 func (db DBRepository) Vote(vote models.Vote, thread *models.Thread) error {
-	conn, err := db.Conn.Acquire(context.Background())
-	if err != nil {
-		return fmt.Errorf("failed to acquire conn: %v", err)
-	}
-	defer conn.Release()
-
 	userVoice := false
 	if vote.Voice > 0 {
 		userVoice = true
@@ -269,7 +226,7 @@ func (db DBRepository) Vote(vote models.Vote, thread *models.Thread) error {
 	var userVote bool
 	queryCheck := "select vote from votes where lower(nick) = $1 and thread = $2"
 
-	err = conn.QueryRow(context.Background(),
+	err := db.Conn.QueryRow(
 		queryCheck,
 		strings.ToLower(vote.Nick),
 		thread.ID,
@@ -282,7 +239,7 @@ func (db DBRepository) Vote(vote models.Vote, thread *models.Thread) error {
 	var diff int32 = 1
 	if userVoice != userVote && err != pgx.ErrNoRows {
 		diff = 2
-		_, err = conn.Exec(context.Background(),
+		_, err = db.Conn.Exec(
 			"update votes set vote = $1 where lower(nick) = $2 and thread = $3",
 			userVoice,
 			strings.ToLower(vote.Nick),
@@ -293,7 +250,7 @@ func (db DBRepository) Vote(vote models.Vote, thread *models.Thread) error {
 		}
 	} else {
 		queryNewVote := "insert into votes(nick, vote, thread) values ($1, $2, $3)"
-		_, err = conn.Exec(context.Background(),
+		_, err = db.Conn.Exec(
 			queryNewVote,
 			vote.Nick,
 			userVoice,
@@ -315,7 +272,7 @@ func (db DBRepository) Vote(vote models.Vote, thread *models.Thread) error {
 
 	query += "where lower(slug) = $1 or id = $2"
 
-	_, err = conn.Exec(context.Background(),
+	_, err = db.Conn.Exec(
 		query,
 		strings.ToLower(thread.Slug),
 		thread.ID,
@@ -327,12 +284,6 @@ func (db DBRepository) Vote(vote models.Vote, thread *models.Thread) error {
 }
 
 func (db DBRepository) Update(id int32, msg, title string) error {
-	conn, err := db.Conn.Acquire(context.Background())
-	if err != nil {
-		return fmt.Errorf("failed to acquire conn: %v", err)
-	}
-	defer conn.Release()
-
 	args := make([]interface{}, 1)
 	args[0] = id
 
@@ -360,7 +311,7 @@ func (db DBRepository) Update(id int32, msg, title string) error {
 
 	query += " where id = $1"
 
-	_, err = conn.Exec(context.Background(),
+	_, err := db.Conn.Exec(
 		query,
 		args...,
 	)

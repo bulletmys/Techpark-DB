@@ -1,32 +1,24 @@
 package repository
 
 import (
-	"context"
 	"fmt"
-	"github.com/jackc/pgx/v4"
-	"github.com/jackc/pgx/v4/pgxpool"
+	"github.com/jackc/pgx"
 	"strconv"
 	"techpark_db/internal/pkg/models"
 )
 
 type DBRepository struct {
-	Conn *pgxpool.Pool
+	Conn *pgx.ConnPool
 }
 
-func newDBRepository(conn *pgxpool.Pool) *DBRepository {
+func newDBRepository(conn *pgx.ConnPool) *DBRepository {
 	return &DBRepository{Conn: conn}
 }
 
 func (db DBRepository) Create(posts []*models.Post) error {
-	conn, err := db.Conn.Acquire(context.Background())
-	if err != nil {
-		return fmt.Errorf("failed to acquire conn: %v", err)
-	}
-	defer conn.Release()
-
 	for _, elem := range posts {
 		var id int64
-		err := conn.QueryRow(context.Background(),
+		err := db.Conn.QueryRow(
 			"insert into posts(nick, message, parent, thread, forum, isEdited, created) values($1, $2, $3, $4, $5, $6, $7) returning id",
 			elem.Author,
 			elem.Message,
@@ -46,18 +38,12 @@ func (db DBRepository) Create(posts []*models.Post) error {
 }
 
 func (db DBRepository) FindPostsByID(posts []*models.Post) error {
-	conn, err := db.Conn.Acquire(context.Background())
-	if err != nil {
-		return fmt.Errorf("failed to acquire conn: %v", err)
-	}
-	defer conn.Release()
-
 	for _, elem := range posts {
 		if elem.Parent == 0 {
 			continue
 		}
 		var dbID int64
-		err := conn.QueryRow(context.Background(),
+		err := db.Conn.QueryRow(
 			"select id from posts where id = $1 and thread = $2",
 			elem.Parent,
 			elem.Thread,
@@ -97,12 +83,6 @@ func configParentTreeQuery(limit int, since int64, desc bool, flag *bool) string
 }
 
 func (db DBRepository) FindPostsParentTree(thread, limit int32, since int64, desc bool) ([]models.Post, error) {
-	conn, err := db.Conn.Acquire(context.Background())
-	if err != nil {
-		return nil, fmt.Errorf("failed to acquire conn: %v", err)
-	}
-	defer conn.Release()
-
 	query := "select nick, created, forum, id, message, thread, parent from get_parent_tree($1, $2, $3)"
 
 	args := make([]interface{}, 3)
@@ -124,14 +104,14 @@ func (db DBRepository) FindPostsParentTree(thread, limit int32, since int64, des
 
 	var offset = 0
 	if since > 0 && !desc {
-		err = conn.QueryRow(context.Background(), "SELECT get_all_foo($1, $2)", since, thread).Scan(&offset)
+		err := db.Conn.QueryRow("SELECT get_all_foo($1, $2)", since, thread).Scan(&offset)
 		if err != nil {
 			return nil, fmt.Errorf("failed to set config posts: %v", err)
 		}
 	}
 	args[2] = offset
 
-	rows, err := conn.Query(context.Background(),
+	rows, err := db.Conn.Query(
 		query,
 		args...
 	)
@@ -163,12 +143,6 @@ func (db DBRepository) FindPostsParentTree(thread, limit int32, since int64, des
 }
 
 func (db DBRepository) FindPostsFlat(thread, limit int32, since int64, desc bool, isTree bool) ([]models.Post, error) {
-	conn, err := db.Conn.Acquire(context.Background())
-	if err != nil {
-		return nil, fmt.Errorf("failed to acquire conn: %v", err)
-	}
-	defer conn.Release()
-
 	flag := false
 	query := findPostsQueryConfigurator(int(limit), since, desc, &flag, isTree)
 
@@ -186,7 +160,7 @@ func (db DBRepository) FindPostsFlat(thread, limit int32, since int64, desc bool
 			qry += "2"
 		}
 		qry += "($1, $2)"
-		err = conn.QueryRow(context.Background(), qry, since, thread).Scan(&offset)
+		err := db.Conn.QueryRow(qry, since, thread).Scan(&offset)
 		if err != nil {
 			return nil, fmt.Errorf("failed to set config posts: %v", err)
 		}
@@ -194,7 +168,7 @@ func (db DBRepository) FindPostsFlat(thread, limit int32, since int64, desc bool
 
 	query += " offset " + strconv.Itoa(offset)
 
-	rows, err := conn.Query(context.Background(),
+	rows, err := db.Conn.Query(
 		query,
 		args...
 	)
@@ -286,12 +260,6 @@ func configFindPostsQuery(limit int, since int64, desc bool, flag *bool) string 
 }
 
 func (db DBRepository) FindPosts(thread, limit int32, since int64, desc bool) ([]models.Post, error) {
-	conn, err := db.Conn.Acquire(context.Background())
-	if err != nil {
-		return nil, fmt.Errorf("failed to acquire conn: %v", err)
-	}
-	defer conn.Release()
-
 	flag := false
 
 	query := configFindPostsQuery(int(limit), since, desc, &flag)
@@ -303,7 +271,7 @@ func (db DBRepository) FindPosts(thread, limit int32, since int64, desc bool) ([
 		args = append(args, since)
 	}
 
-	rows, err := conn.Query(context.Background(),
+	rows, err := db.Conn.Query(
 		query,
 		args...
 	)
@@ -335,17 +303,11 @@ func (db DBRepository) FindPosts(thread, limit int32, since int64, desc bool) ([
 }
 
 func (db DBRepository) GetPost(id int64) (*models.Post, error) {
-	conn, err := db.Conn.Acquire(context.Background())
-	if err != nil {
-		return nil, fmt.Errorf("failed to acquire conn: %v", err)
-	}
-	defer conn.Release()
-
 	var post models.Post
 
 	query := "select nick, created, forum, id, isEdited, message, thread, parent from posts where id = $1"
 
-	err = conn.QueryRow(context.Background(),
+	err := db.Conn.QueryRow(
 		query,
 		id,
 	).Scan(&post.Author, &post.Created, &post.Forum, &post.ID, &post.IsEdited, &post.Message, &post.Thread, &post.Parent)
@@ -360,21 +322,16 @@ func (db DBRepository) GetPost(id int64) (*models.Post, error) {
 }
 
 func (db DBRepository) UpdatePost(id int64, msg string) error {
-	conn, err := db.Conn.Acquire(context.Background())
-	if err != nil {
-		return fmt.Errorf("failed to acquire conn: %v", err)
-	}
-	defer conn.Release()
 
 	query := "update posts set message = $2, isEdited = true where id = $1"
 
-	_, err = conn.Exec(context.Background(),
+	_, err := db.Conn.Exec(
 		query,
 		id,
 		msg,
 	)
 	if err != nil {
-		return  fmt.Errorf("failed to update post: %v", err)
+		return fmt.Errorf("failed to update post: %v", err)
 	}
 
 	return nil

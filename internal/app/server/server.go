@@ -1,10 +1,9 @@
 package server
 
 import (
-	"context"
 	"fmt"
 	"github.com/gorilla/mux"
-	"github.com/jackc/pgx/v4/pgxpool"
+	"github.com/jackc/pgx"
 	"log"
 	"net/http"
 	forumDelivery "techpark_db/internal/pkg/forum/delivery"
@@ -34,8 +33,22 @@ func StartNew() {
 		WriteTimeout: 10 * time.Second,
 	}
 
-	conn, err := pgxpool.Connect(context.Background(), "host=localhost port=5432 user=docker password=docker dbname=docker")
 	//conn, err := pgxpool.Poolect(context.Background(), os.Getenv("DATABASE_URL"))
+	conn, err := pgx.NewConnPool(pgx.ConnPoolConfig{
+		ConnConfig: pgx.ConnConfig{
+			Host:           "localhost",
+			User:           "docker",
+			Password:       "docker",
+			Port:           5432,
+			TLSConfig:      nil,
+			UseFallbackTLS: false,
+			Database:       "docker",
+		},
+		MaxConnections: 20,
+
+		AfterConnect:   nil,
+		AcquireTimeout: 0,
+	})
 	if err != nil {
 		log.Fatalf("failed to connecto to db: %v", err)
 	}

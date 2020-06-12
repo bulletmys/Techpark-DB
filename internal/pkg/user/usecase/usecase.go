@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"fmt"
+	"log"
 	"techpark_db/internal/pkg/models"
 	"techpark_db/internal/pkg/user"
 )
@@ -38,6 +39,7 @@ func (uc UserUC) Find(user models.User) (*models.User, error) {
 func (uc UserUC) Update(user models.User) (*models.User, error) {
 	if user.Email != "" {
 		if userByEmail, _ := uc.UserRepo.FindUserByEmail(user.Email); userByEmail != nil {
+			log.Println("ErrorUC:", userByEmail)
 			return nil, models.SameUserExists
 		}
 	}

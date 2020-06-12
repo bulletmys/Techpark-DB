@@ -112,6 +112,7 @@ func (uh UserHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	dbUser, err := uh.UserUC.Update(userModel)
+	log.Println("Error:", err)
 
 	w.Header().Set("Content-Type", "application/json")
 

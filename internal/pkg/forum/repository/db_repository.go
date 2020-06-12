@@ -1,30 +1,23 @@
 package repository
 
 import (
-	"context"
 	"fmt"
-	"github.com/jackc/pgx/v4"
-	"github.com/jackc/pgx/v4/pgxpool"
+	"github.com/jackc/pgx"
 	"strings"
 	"techpark_db/internal/pkg/models"
 )
 
 type DBRepository struct {
-	Conn *pgxpool.Pool
+	Conn *pgx.ConnPool
 }
 
-func newDBRepository(conn *pgxpool.Pool) *DBRepository {
+func newDBRepository(conn *pgx.ConnPool) *DBRepository {
 	return &DBRepository{Conn: conn}
 }
 
 func (db DBRepository) Create(user models.Forum) error {
-	conn, err := db.Conn.Acquire(context.Background())
-	if err != nil {
-		return fmt.Errorf("failed to acquire conn: %v", err)
-	}
-	defer conn.Release()
 
-	_, err = conn.Exec(context.Background(),
+	_, err := db.Conn.Exec(
 		"insert into forums(slug, nick, title) values($1, $2, $3)",
 		user.Slug,
 		user.User,
@@ -38,15 +31,10 @@ func (db DBRepository) Create(user models.Forum) error {
 }
 
 func (db DBRepository) FindForum(forum models.Forum) (*models.Forum, error) {
-	conn, err := db.Conn.Acquire(context.Background())
-	if err != nil {
-		return nil, fmt.Errorf("failed to acquire conn: %v", err)
-	}
-	defer conn.Release()
 
 	var forumModel models.Forum
 
-	err = conn.QueryRow(context.Background(),
+	err := db.Conn.QueryRow(
 		"select slug, nick, title, threads, posts from forums where lower(nick) = $1 and lower(slug) = $2",
 		strings.ToLower(forum.User),
 		strings.ToLower(forum.Slug),
@@ -60,15 +48,10 @@ func (db DBRepository) FindForum(forum models.Forum) (*models.Forum, error) {
 }
 
 func (db DBRepository) FindForumBySlug(slug string) (*models.Forum, error) {
-	conn, err := db.Conn.Acquire(context.Background())
-	if err != nil {
-		return nil, fmt.Errorf("failed to acquire conn: %v", err)
-	}
-	defer conn.Release()
 
 	var forumModel models.Forum
 
-	err = conn.QueryRow(context.Background(),
+	err := db.Conn.QueryRow(
 		"select slug, nick, title, threads, posts from forums where lower(slug) = $1",
 		strings.ToLower(slug),
 	).Scan(&forumModel.Slug, &forumModel.User, &forumModel.Title, &forumModel.Threads, &forumModel.Posts)

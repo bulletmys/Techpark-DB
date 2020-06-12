@@ -82,6 +82,7 @@ func (uc ThreadUC) Vote(vote models.Vote, slug string, id int32) (*models.Thread
 	if dbThread == nil {
 		return nil, models.ThreadNotFound
 	}
+	//dbThread := *models.Thread{ID: id, Slug: slug}
 
 	return dbThread, uc.ThreadRepo.Vote(vote, dbThread)
 }

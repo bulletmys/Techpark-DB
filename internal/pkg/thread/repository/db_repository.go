@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"database/sql"
 	"fmt"
 	"github.com/jackc/pgx"
 	"strconv"
@@ -57,7 +58,7 @@ func (db DBRepository) FindThreadBySlug(slug string) (*models.Thread, error) {
 	var thread models.Thread
 
 	err := db.Conn.QueryRow(
-		"select nick, created, forum, id, message, slug, title, votes from threads where lower(slug) = $1",
+		"select nick, created, forum, id, message, slug, title, votes from threads where slug = $1",
 		strings.ToLower(slug),
 	).Scan(
 		&thread.Author,
@@ -113,7 +114,7 @@ func (db DBRepository) FindAndGetID(slug string, id int32) (int32, string) {
 
 	var forum string
 	err := db.Conn.QueryRow(
-		"select id, forum from threads where lower(slug) = $1 or id = $2",
+		"select id, forum from threads where slug = $1 or id = $2",
 		strings.ToLower(slug),
 		id,
 	).Scan(&id, &forum)
@@ -125,6 +126,8 @@ func (db DBRepository) FindAndGetID(slug string, id int32) (int32, string) {
 
 func (db DBRepository) FindBySlugOrID(slug string, id int32) (*models.Thread, error) {
 	var thread models.Thread
+
+	var sluggg sql.NullString
 
 	err := db.Conn.QueryRow(
 		"select nick, created, forum, id, message, title, votes, slug from threads where id = $1 or slug = $2",
@@ -138,8 +141,11 @@ func (db DBRepository) FindBySlugOrID(slug string, id int32) (*models.Thread, er
 		&thread.Message,
 		&thread.Title,
 		&thread.Votes,
-		&thread.Slug,
+		&sluggg,
 	)
+	if sluggg.Valid {
+		thread.Slug = sluggg.String
+	}
 	if err == pgx.ErrNoRows {
 		return nil, nil
 	}

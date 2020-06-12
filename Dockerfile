@@ -1,4 +1,5 @@
 FROM golang:1.14 AS builder
+ENV GO111MODULE=on
 WORKDIR /app
 
 COPY go.mod .

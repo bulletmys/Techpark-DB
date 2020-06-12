@@ -40,7 +40,6 @@ func (db DBRepository) Create(posts []*models.Post) error {
 			return fmt.Errorf("failed to create posts: %v", err)
 		}
 		elem.ID = id
-		fmt.Printf("%+v\n", elem)
 	}
 
 	return nil
@@ -194,8 +193,6 @@ func (db DBRepository) FindPostsFlat(thread, limit int32, since int64, desc bool
 	}
 
 	query += " offset " + strconv.Itoa(offset)
-
-	fmt.Println(query)
 
 	rows, err := conn.Query(context.Background(),
 		query,

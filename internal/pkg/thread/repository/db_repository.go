@@ -127,7 +127,7 @@ func (db DBRepository) FindBySlugOrID(slug string, id int32) (*models.Thread, er
 	var thread models.Thread
 
 	err := db.Conn.QueryRow(
-		"select nick, created, forum, id, message, slug, title, votes from threads where id = $1 or slug = $2",
+		"select nick, created, forum, id, message, title, votes, slug from threads where id = $1 or slug = $2",
 		id,
 		strings.ToLower(slug),
 	).Scan(
@@ -136,16 +136,16 @@ func (db DBRepository) FindBySlugOrID(slug string, id int32) (*models.Thread, er
 		&thread.Forum,
 		&thread.ID,
 		&thread.Message,
-		&thread.Slug,
 		&thread.Title,
 		&thread.Votes,
+		&thread.Slug,
 	)
 	if err == pgx.ErrNoRows {
 		return nil, nil
 	}
-	//if err != nil {
-	//	return nil, err
-	//}
+	if err != nil {
+		return nil, err
+	}
 	return &thread, nil
 }
 
@@ -240,7 +240,7 @@ func (db DBRepository) Vote(vote models.Vote, thread *models.Thread) error {
 	if userVoice != userVote && err != pgx.ErrNoRows {
 		diff = 2
 		_, err = db.Conn.Exec(
-			"update votes set vote = $1 where lower(nick) = $2 and thread = $3",
+			"update votes set vote = $1 where nick = $2 and thread = $3",
 			userVoice,
 			strings.ToLower(vote.Nick),
 			thread.ID,
@@ -270,11 +270,10 @@ func (db DBRepository) Vote(vote models.Vote, thread *models.Thread) error {
 		thread.Votes += diff
 	}
 
-	query += "where lower(slug) = $1 or id = $2"
+	query += "where id = $1"
 
 	_, err = db.Conn.Exec(
 		query,
-		strings.ToLower(thread.Slug),
 		thread.ID,
 	)
 	if err != nil {

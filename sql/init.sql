@@ -19,16 +19,14 @@ CREATE UNLOGGED TABLE forums
 
 CREATE UNLOGGED TABLE threads
 (
-    nick    CITEXT  NOT NULL,
+    nick    CITEXT  NOT NULL REFERENCES users (nick),
     created timestamptz,
-    forum   CITEXT  NOT NULL,
+    forum   CITEXT  NOT NULL REFERENCES forums (slug),
     id      BIGSERIAL PRIMARY KEY,
     message VARCHAR NOT NULL,
     slug    CITEXT UNIQUE,
     title   VARCHAR NOT NULL,
-    votes   int default 0,
-    FOREIGN KEY (nick) REFERENCES users (nick),
-    FOREIGN KEY (forum) REFERENCES forums (slug)
+    votes   int default 0
 );
 
 CREATE OR REPLACE FUNCTION after_thread_insert_func() RETURNS TRIGGER AS
@@ -47,18 +45,15 @@ EXECUTE PROCEDURE after_thread_insert_func();
 
 CREATE UNLOGGED TABLE posts
 (
-    nick     CITEXT  NOT NULL,
+    nick     CITEXT  NOT NULL REFERENCES users (nick),
     created  timestamptz,
-    forum    CITEXT  NOT NULL,
+    forum    CITEXT  NOT NULL REFERENCES forums (slug),
     id       BIGSERIAL PRIMARY KEY,
     isEdited bool    NOT NULL,
     message  VARCHAR NOT NULL,
     parent   BIGINT DEFAULT 0,
-    thread   int     not null,
-    path     BIGINT[],
-    FOREIGN KEY (nick) REFERENCES users (nick),
-    FOREIGN KEY (forum) REFERENCES forums (slug),
-    FOREIGN KEY (thread) REFERENCES threads (id)
+    thread   int     not null REFERENCES threads (id),
+    path     BIGINT[]
 );
 
 CREATE OR REPLACE FUNCTION after_post_insert_func() RETURNS TRIGGER AS
@@ -85,28 +80,10 @@ EXECUTE PROCEDURE after_post_insert_func();
 
 CREATE UNLOGGED TABLE votes
 (
-    nick   CITEXT not null,
+    nick   CITEXT not null REFERENCES users (nick),
     vote   bool   not null,
-    thread int4   not null,
-    FOREIGN KEY (nick) REFERENCES users (nick),
-    FOREIGN KEY (thread) REFERENCES threads (id)
+    thread int4   not null REFERENCES threads (id)
 );
-
-CREATE OR REPLACE FUNCTION check_global_var(v bigint, cur bigint) RETURNS bool as
-$$
-DECLARE
-    p int4;
-BEGIN
-    p := (SELECT current_setting('myapp.var1'));
-    if (cur > v and p = '1') then
-        SELECT set_config('myapp.var1', '0', false);
-        return (select true);
-    else
-        return (select false);
-    end if;
-END;
-$$ LANGUAGE plpgsql;
-
 
 CREATE OR REPLACE FUNCTION get_all_foo(since int, threadID bigint) RETURNS int AS
 $BODY$
@@ -153,24 +130,6 @@ END
 $BODY$
     LANGUAGE plpgsql;
 
-
-CREATE OR REPLACE FUNCTION lol() RETURNS posts AS
-$BODY$
-DECLARE
-    r   posts%rowtype;
-    r2  RECORD;
-    kek int;
-BEGIN
-    kek := 0;
-    FOR r IN
-        SELECT * FROM posts WHERE parent = 0 order by id desc
-        LOOP
-            RETURN (select * from posts where parent = r.parent order by id);
-        END LOOP;
-END
-$BODY$
-    LANGUAGE plpgsql;
-
 CREATE OR REPLACE FUNCTION get_all_foo2(since int, threadID bigint) RETURNS int AS
 $BODY$
 DECLARE
@@ -195,13 +154,14 @@ $BODY$
 
 CREATE UNIQUE INDEX IF NOT EXISTS index_forum_slug  ON forums (slug);
 CREATE INDEX IF NOT EXISTS index_posts_forum ON posts (forum);
+CREATE INDEX IF NOT EXISTS index_posts_forum ON posts (parent); -- ???
 CREATE INDEX IF NOT EXISTS index_threads_forum ON threads (forum);
 CREATE INDEX IF NOT EXISTS index_threads_slug_id ON threads (slug, id);
-CREATE INDEX IF NOT EXISTS index_posts_thread_id_parent ON posts (thread, id) WHERE parent = 0;
+-- CREATE INDEX IF NOT EXISTS index_posts_thread_id_parent ON posts (thread, id) WHERE parent = 0;
 CREATE INDEX IF NOT EXISTS index_posts_thread_id ON posts (id, thread);
--- CREATE INDEX IF NOT EXISTS index_posts_thread_path_first ON posts (thread, (path[1]), id);
+CREATE INDEX IF NOT EXISTS index_posts_thread_path_first ON posts (thread, (path[1]), id);
 CREATE INDEX IF NOT EXISTS index_threads_slug ON threads (slug);
-CREATE INDEX IF NOT EXISTS index_posts_thread_id_triple ON posts (id, created, thread);
+-- CREATE INDEX IF NOT EXISTS index_posts_thread_id_triple ON posts (id, created, thread);
 CREATE UNIQUE INDEX IF NOT EXISTS index_votes_thread_nickname ON votes (thread, nick);
 CREATE INDEX IF NOT EXISTS index_posts_thread_path ON posts (thread, path);
 

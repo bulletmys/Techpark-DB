@@ -200,6 +200,9 @@ func (db DBRepository) GetThreadsByForum(forumSlug string, limit int, since time
 	}
 
 	threads := make([]models.Thread, 0)
+	var sMess sql.NullString
+	var sSlug sql.NullString
+	var sTitle sql.NullString
 
 	defer rows.Close()
 
@@ -210,12 +213,22 @@ func (db DBRepository) GetThreadsByForum(forumSlug string, limit int, since time
 			&threadModel.Created,
 			&threadModel.Forum,
 			&threadModel.ID,
-			&threadModel.Message,
-			&threadModel.Slug,
-			&threadModel.Title,
+			&sMess,
+			&sSlug,
+			&sTitle,
 			&threadModel.Votes,
 		); err != nil {
 			return nil, fmt.Errorf("error while scaning query rows: %v", err)
+		}
+
+		if sMess.Valid {
+			threadModel.Message = sMess.String
+		}
+		if sSlug.Valid {
+			threadModel.Slug = sSlug.String
+		}
+		if sTitle.Valid {
+			threadModel.Title = sTitle.String
 		}
 
 		threads = append(threads, threadModel)

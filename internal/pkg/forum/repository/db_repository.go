@@ -35,7 +35,7 @@ func (db DBRepository) FindForum(forum models.Forum) (*models.Forum, error) {
 	var forumModel models.Forum
 
 	err := db.Conn.QueryRow(
-		"select slug, nick, title, threads, posts from forums where lower(nick) = $1 and lower(slug) = $2",
+		"select slug, nick, title, threads, posts from forums where nick = $1 and slug = $2",
 		strings.ToLower(forum.User),
 		strings.ToLower(forum.Slug),
 	).Scan(&forumModel.Slug, &forumModel.User, &forumModel.Title, &forumModel.Threads, &forumModel.Posts)
@@ -52,7 +52,7 @@ func (db DBRepository) FindForumBySlug(slug string) (*models.Forum, error) {
 	var forumModel models.Forum
 
 	err := db.Conn.QueryRow(
-		"select slug, nick, title, threads, posts from forums where lower(slug) = $1",
+		"select slug, nick, title, threads, posts from forums where slug = $1",
 		strings.ToLower(slug),
 	).Scan(&forumModel.Slug, &forumModel.User, &forumModel.Title, &forumModel.Threads, &forumModel.Posts)
 

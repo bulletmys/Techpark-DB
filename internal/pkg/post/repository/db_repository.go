@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"errors"
 	"fmt"
 	"github.com/jackc/pgx"
 	"strconv"
@@ -45,14 +46,13 @@ func (db DBRepository) CheckParentPostByID(post *models.Post) error {
 	if post.Parent == 0 {
 		return nil
 	}
-
 	err := db.Conn.QueryRow(
 		"select path, thread from posts where id = $1",
 		post.Parent,
 	).Scan(&s, &thr)
 
-	if err != nil || thr != post.Thread{
-		return err
+	if err != nil || thr != post.Thread {
+		return errors.New("failed to get parent")
 	}
 	post.Path = s
 

@@ -56,6 +56,9 @@ func (db DBRepository) Create(thread models.Thread) (int32, error) {
 
 func (db DBRepository) FindThreadBySlug(slug string) (*models.Thread, error) {
 	var thread models.Thread
+	var sMess sql.NullString
+	var sSlug sql.NullString
+	var sTitle sql.NullString
 
 	err := db.Conn.QueryRow(
 		"select nick, created, forum, id, message, slug, title, votes from threads where slug = $1",
@@ -65,9 +68,9 @@ func (db DBRepository) FindThreadBySlug(slug string) (*models.Thread, error) {
 		&thread.Created,
 		&thread.Forum,
 		&thread.ID,
-		&thread.Message,
-		&thread.Slug,
-		&thread.Title,
+		&sMess,
+		&sSlug,
+		&sTitle,
 		&thread.Votes,
 	)
 
@@ -79,11 +82,24 @@ func (db DBRepository) FindThreadBySlug(slug string) (*models.Thread, error) {
 		return nil, fmt.Errorf("failed to find thread by slug: %v", err)
 	}
 
+	if sMess.Valid {
+		thread.Message = sMess.String
+	}
+	if sSlug.Valid {
+		thread.Slug = sSlug.String
+	}
+	if sTitle.Valid {
+		thread.Title = sTitle.String
+	}
+
 	return &thread, nil
 }
 
 func (db DBRepository) FindThreadByID(id int32) (*models.Thread, error) {
 	var thread models.Thread
+	var sMess sql.NullString
+	var sSlug sql.NullString
+	var sTitle sql.NullString
 
 	err := db.Conn.QueryRow(
 		"select nick, created, forum, id, message, slug, title, votes from threads where id = $1",
@@ -93,9 +109,9 @@ func (db DBRepository) FindThreadByID(id int32) (*models.Thread, error) {
 		&thread.Created,
 		&thread.Forum,
 		&thread.ID,
-		&thread.Message,
-		&thread.Slug,
-		&thread.Title,
+		&sMess,
+		&sSlug,
+		&sTitle,
 		&thread.Votes,
 	)
 
@@ -105,6 +121,16 @@ func (db DBRepository) FindThreadByID(id int32) (*models.Thread, error) {
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to find thread by id: %v", err)
+	}
+
+	if sMess.Valid {
+		thread.Message = sMess.String
+	}
+	if sSlug.Valid {
+		thread.Slug = sSlug.String
+	}
+	if sTitle.Valid {
+		thread.Title = sTitle.String
 	}
 
 	return &thread, nil

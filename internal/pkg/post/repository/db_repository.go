@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"database/sql"
 	"errors"
 	"fmt"
 	"github.com/jackc/pgx"
@@ -146,6 +147,8 @@ func (db DBRepository) FindPostsParentTree(thread, limit int32, since int64, des
 	posts := make([]models.Post, 0)
 	defer rows.Close()
 
+	var s sql.NullString
+
 	for rows.Next() {
 		postModel := models.Post{}
 		if err := rows.Scan(
@@ -153,11 +156,15 @@ func (db DBRepository) FindPostsParentTree(thread, limit int32, since int64, des
 			&postModel.Created,
 			&postModel.Forum,
 			&postModel.ID,
-			&postModel.Message,
+			&s,
 			&postModel.Thread,
 			&postModel.Parent,
 		); err != nil {
 			return nil, fmt.Errorf("error while scaning query rows: %v", err)
+		}
+
+		if s.Valid {
+			postModel.Message = s.String
 		}
 
 		posts = append(posts, postModel)
@@ -202,6 +209,7 @@ func (db DBRepository) FindPostsFlat(thread, limit int32, since int64, desc bool
 
 	posts := make([]models.Post, 0)
 	defer rows.Close()
+	var s sql.NullString
 
 	for rows.Next() {
 		postModel := models.Post{}
@@ -210,11 +218,15 @@ func (db DBRepository) FindPostsFlat(thread, limit int32, since int64, desc bool
 			&postModel.Created,
 			&postModel.Forum,
 			&postModel.ID,
-			&postModel.Message,
+			&s,
 			&postModel.Thread,
 			&postModel.Parent,
 		); err != nil {
 			return nil, fmt.Errorf("error while scaning query rows: %v", err)
+		}
+
+		if s.Valid {
+			postModel.Message = s.String
 		}
 
 		posts = append(posts, postModel)
@@ -306,6 +318,8 @@ func (db DBRepository) FindPosts(thread, limit int32, since int64, desc bool) ([
 	posts := make([]models.Post, 0)
 	defer rows.Close()
 
+	var s sql.NullString
+
 	for rows.Next() {
 		postModel := models.Post{}
 		if err := rows.Scan(
@@ -313,11 +327,15 @@ func (db DBRepository) FindPosts(thread, limit int32, since int64, desc bool) ([
 			&postModel.Created,
 			&postModel.Forum,
 			&postModel.ID,
-			&postModel.Message,
+			&s,
 			&postModel.Thread,
 			&postModel.Parent,
 		); err != nil {
 			return nil, fmt.Errorf("error while scaning query rows: %v", err)
+		}
+
+		if s.Valid {
+			postModel.Message = s.String
 		}
 
 		posts = append(posts, postModel)
@@ -331,10 +349,16 @@ func (db DBRepository) GetPost(id int64) (*models.Post, error) {
 
 	query := "select nick, created, forum, id, isEdited, message, thread, parent from posts where id = $1"
 
+	var s sql.NullString
+
 	err := db.Conn.QueryRow(
 		query,
 		id,
-	).Scan(&post.Author, &post.Created, &post.Forum, &post.ID, &post.IsEdited, &post.Message, &post.Thread, &post.Parent)
+	).Scan(&post.Author, &post.Created, &post.Forum, &post.ID, &post.IsEdited, &s, &post.Thread, &post.Parent)
+
+	if s.Valid {
+		post.Message = s.String
+	}
 
 	if err == pgx.ErrNoRows {
 		return nil, nil

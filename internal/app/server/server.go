@@ -1,11 +1,10 @@
 package server
 
 import (
-	"fmt"
-	"github.com/gorilla/mux"
+	"github.com/fasthttp/router"
 	"github.com/jackc/pgx"
+	"github.com/valyala/fasthttp"
 	"log"
-	"net/http"
 	forumDelivery "techpark_db/internal/pkg/forum/delivery"
 	forumRepo "techpark_db/internal/pkg/forum/repository"
 	forumUC "techpark_db/internal/pkg/forum/usecase"
@@ -20,18 +19,10 @@ import (
 	userDelivery "techpark_db/internal/pkg/user/delivery"
 	userRepo "techpark_db/internal/pkg/user/repository"
 	userUC "techpark_db/internal/pkg/user/usecase"
-	"time"
 )
 
 func StartNew() {
-	m := mux.NewRouter()
-
-	server := http.Server{
-		Addr:         ":5000",
-		Handler:      m,
-		ReadTimeout:  10 * time.Second,
-		WriteTimeout: 10 * time.Second,
-	}
+	r := router.New()
 
 	//conn, err := pgxpool.Poolect(context.Background(), os.Getenv("DATABASE_URL"))
 	conn, err := pgx.NewConnPool(pgx.ConnPoolConfig{
@@ -81,31 +72,35 @@ func StartNew() {
 
 	service := delivery.ServiceHandler{ServiceRepo: repository.NewDBServiceRepository(conn)}
 
-	m.HandleFunc("/api/user/{nickname}/create", user.Create).Methods("POST")
-	m.HandleFunc("/api/user/{nickname}/profile", user.Find).Methods("GET")
-	m.HandleFunc("/api/user/{nickname}/profile", user.Update).Methods("POST")
+	r.POST("/api/user/{nickname}/create", user.Create)
+	//r.GET(, user.Create)
+	r.GET("/api/user/{nickname}/profile", user.Find)
+	r.POST("/api/user/{nickname}/profile", user.Update)
 
-	m.HandleFunc("/api/forum/create", forum.Create).Methods("POST")
-	m.HandleFunc("/api/forum/{slug}/details", forum.Find).Methods("GET")
-	m.HandleFunc("/api/forum/{slug}/create", thread.Create).Methods("POST")
-	m.HandleFunc("/api/forum/{slug}/threads", thread.GetThreadsByForum).Methods("GET")
-	m.HandleFunc("/api/forum/{slug}/users", forum.GetForumUsers).Methods("GET")
+	r.POST("/api/forum/create", forum.Create)
+	r.GET("/api/forum/{slug}/details", forum.Find)
+	r.POST("/api/forum/{slug}/create", thread.Create)
+	r.GET("/api/forum/{slug}/threads", thread.GetThreadsByForum)
+	r.GET("/api/forum/{slug}/users", forum.GetForumUsers)
 
-	m.HandleFunc("/api/thread/{slug_or_id}/create", post.Create).Methods("POST")
-	m.HandleFunc("/api/thread/{slug_or_id}/vote", thread.Vote).Methods("POST")
-	m.HandleFunc("/api/thread/{slug_or_id}/details", thread.Get).Methods("GET")
-	m.HandleFunc("/api/thread/{slug_or_id}/details", thread.Update).Methods("POST")
-	m.HandleFunc("/api/thread/{slug_or_id}/posts", post.Find).Methods("GET")
+	r.POST("/api/thread/{slug_or_id}/create", post.Create)
+	r.POST("/api/thread/{slug_or_id}/vote", thread.Vote)
+	r.GET("/api/thread/{slug_or_id}/details", thread.Get)
+	r.POST("/api/thread/{slug_or_id}/details", thread.Update)
+	r.GET("/api/thread/{slug_or_id}/posts", post.Find)
 
-	m.HandleFunc("/api/post/{id}/details", post.GetDetails).Methods("GET")
-	m.HandleFunc("/api/post/{id}/details", post.Update).Methods("POST")
+	r.GET("/api/post/{id}/details", post.GetDetails)
+	r.POST("/api/post/{id}/details", post.Update)
 
-	m.HandleFunc("/api/service/status", service.Status).Methods("GET")
-	m.HandleFunc("/api/service/clear", service.Clear).Methods("POST")
+	r.GET("/api/service/status", service.Status)
+	r.POST("/api/service/clear", service.Clear)
 
-	fmt.Println("starting server at :5000")
+	log.Println("starting server at :5000")
 
-	if err := server.ListenAndServe(); err != nil {
-		log.Fatal("failed to start server", err)
+	//if err := server.ListenAndServe(); err != nil {
+	//	log.Fatal("failed to start server", err)
+	//}
+	if err := fasthttp.ListenAndServe(":5000", r.Handler); err != nil {
+		log.Fatalf("Error in ListenAndServe: %s", err)
 	}
 }

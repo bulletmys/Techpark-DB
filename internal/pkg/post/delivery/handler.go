@@ -1,13 +1,12 @@
 package delivery
 
 import (
+	"bytes"
 	"encoding/json"
-	"github.com/gorilla/mux"
+	"github.com/valyala/fasthttp"
 	"log"
 	"net/http"
 	"strconv"
-	"strings"
-	"techpark_db/internal/pkg/helpers"
 	"techpark_db/internal/pkg/models"
 	"techpark_db/internal/pkg/post"
 )
@@ -20,11 +19,11 @@ func NewPostHandler(uc post.UseCase) *PostHandler {
 	return &PostHandler{PostUC: uc}
 }
 
-func (uh PostHandler) Create(w http.ResponseWriter, r *http.Request) {
-	slugOrID, ok := mux.Vars(r)["slug_or_id"]
+func (uh PostHandler) Create(ctx *fasthttp.RequestCtx) {
+	slugOrID, ok := ctx.UserValue("slug_or_id").(string)
 	if !ok {
 		log.Print("no slug in vars")
-		http.Error(w, "no slug in vars", http.StatusBadRequest)
+		ctx.Error("no slug in vars", http.StatusBadRequest)
 		return
 	}
 
@@ -34,49 +33,55 @@ func (uh PostHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	posts := make([]*models.Post, 0)
-	if err := json.NewDecoder(r.Body).Decode(&posts); err != nil {
+	if err := json.Unmarshal(ctx.PostBody(), &posts); err != nil {
 		log.Print(err)
-		http.Error(w, "can't decode posts data from body", http.StatusBadRequest)
+		ctx.Error("can't decode posts data from body", http.StatusBadRequest)
 		return
 	}
 
 	err = uh.PostUC.Create(posts, slugOrID, int32(threadID))
 
-	w.Header().Set("Content-Type", "application/json")
+	ctx.Response.Header.Set("Content-Type", "application/json")
 
 	switch err {
 	case models.UserNotFound:
 		fallthrough
 	case models.ThreadNotFound:
 		log.Print(err)
-		w.WriteHeader(http.StatusNotFound)
-		helpers.EncodeAndSend(models.Message{Msg: err.Error()}, w)
+		ctx.SetStatusCode(http.StatusNotFound)
+		if err := json.NewEncoder(ctx.Response.BodyWriter()).Encode(models.Message{Msg: err.Error()}); err != nil {
+			log.Print(err)
+			ctx.Error("failed to encode data to json", http.StatusInternalServerError)
+		}
 		return
 	case models.PostNotFound:
 		log.Print(err)
-		w.WriteHeader(http.StatusConflict)
-		helpers.EncodeAndSend(models.Message{Msg: err.Error()}, w)
+		ctx.SetStatusCode(http.StatusConflict)
+		if err := json.NewEncoder(ctx.Response.BodyWriter()).Encode(models.Message{Msg: err.Error()}); err != nil {
+			log.Print(err)
+			ctx.Error("failed to encode data to json", http.StatusInternalServerError)
+		}
 		return
 	case nil:
-		w.WriteHeader(http.StatusCreated)
+		ctx.SetStatusCode(http.StatusCreated)
 	default:
 		log.Print(err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		ctx.Error(err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	if err := json.NewEncoder(w).Encode(posts); err != nil {
+	if err := json.NewEncoder(ctx.Response.BodyWriter()).Encode(posts); err != nil {
 		log.Print(err)
-		http.Error(w, "failed to encode posts to json", http.StatusInternalServerError)
+		ctx.Error("failed to encode posts to json", http.StatusInternalServerError)
 		return
 	}
 }
 
-func (uh PostHandler) Find(w http.ResponseWriter, r *http.Request) {
-	slugOrID, ok := mux.Vars(r)["slug_or_id"]
+func (uh PostHandler) Find(ctx *fasthttp.RequestCtx) {
+	slugOrID, ok := ctx.UserValue("slug_or_id").(string)
 	if !ok {
 		log.Print("no slug in vars")
-		http.Error(w, "no slug in vars", http.StatusBadRequest)
+		ctx.Error("no slug in vars", http.StatusBadRequest)
 		return
 	}
 
@@ -85,22 +90,19 @@ func (uh PostHandler) Find(w http.ResponseWriter, r *http.Request) {
 		threadID = -1
 	}
 
-	limit, err := strconv.Atoi(r.URL.Query().Get("limit"))
+	limit, err := ctx.URI().QueryArgs().GetUint("limit")
 	if err != nil {
 		limit = 0
 	}
 
-	since, err := strconv.ParseInt(r.URL.Query().Get("since"), 10, 64)
+	since, err := strconv.ParseInt(string(ctx.URI().QueryArgs().Peek("since")), 10, 64)
 	if err != nil {
 		since = 0
 	}
 
-	desc, err := strconv.ParseBool(r.URL.Query().Get("desc"))
-	if err != nil {
-		desc = false
-	}
+	desc := ctx.URI().QueryArgs().GetBool("desc")
 
-	sort := r.URL.Query().Get("sort")
+	sort := string(ctx.URI().QueryArgs().Peek("sort"))
 
 	var sortType post.SortType
 
@@ -117,41 +119,44 @@ func (uh PostHandler) Find(w http.ResponseWriter, r *http.Request) {
 
 	posts, err := uh.PostUC.Find(slugOrID, int32(threadID), int32(limit), since, desc, sortType)
 
-	w.Header().Set("Content-Type", "application/json")
+	ctx.Response.Header.Set("Content-Type", "application/json")
 
 	switch err {
 	case models.ThreadNotFound:
 		log.Print(err)
-		w.WriteHeader(http.StatusNotFound)
-		helpers.EncodeAndSend(models.Message{Msg: err.Error()}, w)
+		ctx.SetStatusCode(http.StatusNotFound)
+		if err := json.NewEncoder(ctx.Response.BodyWriter()).Encode(models.Message{Msg: err.Error()}); err != nil {
+			log.Print(err)
+			ctx.Error("failed to encode data to json", http.StatusInternalServerError)
+		}
 		return
 	case nil:
 		break
 	default:
 		log.Print(err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		ctx.Error(err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	if err := json.NewEncoder(w).Encode(posts); err != nil {
+	if err := json.NewEncoder(ctx.Response.BodyWriter()).Encode(posts); err != nil {
 		log.Print(err)
-		http.Error(w, "failed to encode posts to json", http.StatusInternalServerError)
+		ctx.Error("failed to encode posts to json", http.StatusInternalServerError)
 		return
 	}
 }
 
-func (uh PostHandler) GetDetails(w http.ResponseWriter, r *http.Request) {
-	id, ok := mux.Vars(r)["id"]
+func (uh PostHandler) GetDetails(ctx *fasthttp.RequestCtx) {
+	id, ok := ctx.UserValue("id").(string)
 	if !ok {
 		log.Print("no id in vars")
-		http.Error(w, "no id in vars", http.StatusBadRequest)
+		ctx.Error("no id in vars", http.StatusBadRequest)
 		return
 	}
 
 	postID, err := strconv.Atoi(id)
 	if err != nil {
 		log.Print("failed to parse id from vars")
-		http.Error(w, "failed to parse id from vars", http.StatusBadRequest)
+		ctx.Error("failed to parse id from vars", http.StatusBadRequest)
 		return
 	}
 
@@ -159,13 +164,13 @@ func (uh PostHandler) GetDetails(w http.ResponseWriter, r *http.Request) {
 	threadFlag := false
 	forumFlag := false
 
-	related, ok := r.URL.Query()["related"]
-	if ok {
-		related = strings.Split(related[0], ",")
+	related := ctx.URI().QueryArgs().PeekMulti("related")
+	if related != nil  {
+		related = bytes.Split(related[0], []byte(","))
 	}
 
 	for _, elem := range related {
-		switch elem {
+		switch string(elem) {
 		case "user":
 			userFlag = true
 		case "thread":
@@ -179,7 +184,7 @@ func (uh PostHandler) GetDetails(w http.ResponseWriter, r *http.Request) {
 	}
 	details, err := uh.PostUC.FullPostInfo(int64(postID), userFlag, forumFlag, threadFlag)
 
-	w.Header().Set("Content-Type", "application/json")
+	ctx.Response.Header.Set("Content-Type", "application/json")
 
 	switch err {
 	case models.UserNotFound:
@@ -190,67 +195,73 @@ func (uh PostHandler) GetDetails(w http.ResponseWriter, r *http.Request) {
 		fallthrough
 	case models.PostNotFound:
 		log.Print(err)
-		w.WriteHeader(http.StatusNotFound)
-		helpers.EncodeAndSend(models.Message{Msg: err.Error()}, w)
+		ctx.SetStatusCode(http.StatusNotFound)
+		if err := json.NewEncoder(ctx.Response.BodyWriter()).Encode(models.Message{Msg: err.Error()}); err != nil {
+			log.Print(err)
+			ctx.Error("failed to encode data to json", http.StatusInternalServerError)
+		}
 		return
 	case nil:
 		break
 	default:
 		log.Print(err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		ctx.Error(err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	if err := json.NewEncoder(w).Encode(details); err != nil {
+	if err := json.NewEncoder(ctx.Response.BodyWriter()).Encode(details); err != nil {
 		log.Print(err)
-		http.Error(w, "failed to encode posts to json", http.StatusInternalServerError)
+		ctx.Error("failed to encode posts to json", http.StatusInternalServerError)
 		return
 	}
 }
 
-func (uh PostHandler) Update(w http.ResponseWriter, r *http.Request) {
-	id, ok := mux.Vars(r)["id"]
+func (uh PostHandler) Update(ctx *fasthttp.RequestCtx) {
+	id, ok := ctx.UserValue("id").(string)
 	if !ok {
 		log.Print("no id in vars")
-		http.Error(w, "no id in vars", http.StatusBadRequest)
+		ctx.Error("no id in vars", http.StatusBadRequest)
 		return
 	}
 
 	postID, err := strconv.Atoi(id)
 	if err != nil {
 		log.Print("failed to parse id from vars")
-		http.Error(w, "failed to parse id from vars", http.StatusBadRequest)
+		ctx.Error("failed to parse id from vars", http.StatusBadRequest)
 		return
 	}
 
 	modelPost := models.Post{}
-	if err := json.NewDecoder(r.Body).Decode(&modelPost); err != nil {
+	if err := json.Unmarshal(ctx.PostBody(), &modelPost); err != nil {
 		log.Print(err)
-		http.Error(w, "can't decode posts data from body", http.StatusBadRequest)
+		ctx.Error("can't decode posts data from body", http.StatusBadRequest)
 		return
 	}
 
 	dbPost, err := uh.PostUC.Update(int64(postID), modelPost.Message)
 
-	w.Header().Set("Content-Type", "application/json")
+	ctx.Response.Header.Set("Content-Type", "application/json")
 
 	switch err {
 	case models.PostNotFound:
 		log.Print(err)
-		w.WriteHeader(http.StatusNotFound)
-		helpers.EncodeAndSend(models.Message{Msg: err.Error()}, w)
+		ctx.SetStatusCode(http.StatusNotFound)
+		if err := json.NewEncoder(ctx.Response.BodyWriter()).Encode(models.Message{Msg: err.Error()}); err != nil {
+			log.Print(err)
+			ctx.Error("failed to encode data to json", http.StatusInternalServerError)
+		}
 		return
 	case nil:
 		break
 	default:
 		log.Print(err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		ctx.Error(err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	if err := json.NewEncoder(w).Encode(dbPost); err != nil {
+	if err := json.NewEncoder(ctx.Response.BodyWriter()).Encode(dbPost); err != nil {
 		log.Print(err)
-		http.Error(w, "failed to encode posts to json", http.StatusInternalServerError)
+		ctx.Error("failed to encode posts to json", http.StatusInternalServerError)
 		return
 	}
 }

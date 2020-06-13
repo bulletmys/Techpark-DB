@@ -15,5 +15,3 @@ var ThreadNotFound = errors.New("can't find thread with this data")
 var SameThreadExists = errors.New("thread with same data is already exists")
 
 var PostNotFound = errors.New("can't find post with this data")
-
-var SamePostExists = errors.New("post with same data is already exists")

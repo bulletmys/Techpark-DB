@@ -2,11 +2,10 @@ package delivery
 
 import (
 	"encoding/json"
-	"github.com/gorilla/mux"
+	"github.com/valyala/fasthttp"
 	"log"
 	"net/http"
 	"strconv"
-	"techpark_db/internal/pkg/helpers"
 	"techpark_db/internal/pkg/models"
 	"techpark_db/internal/pkg/thread"
 	"time"
@@ -20,18 +19,18 @@ func NewForumHandler(uc thread.UseCase) *ThreadHandler {
 	return &ThreadHandler{ThreadUC: uc}
 }
 
-func (uh ThreadHandler) Create(w http.ResponseWriter, r *http.Request) {
-	slug, ok := mux.Vars(r)["slug"]
+func (uh ThreadHandler) Create(ctx *fasthttp.RequestCtx) {
+	slug, ok := ctx.UserValue("slug").(string)
 	if !ok {
 		log.Print("no slug in vars")
-		http.Error(w, "no slug in vars", http.StatusBadRequest)
+		ctx.Error("no slug in vars", http.StatusBadRequest)
 		return
 	}
 
 	threadModel := models.Thread{}
-	if err := json.NewDecoder(r.Body).Decode(&threadModel); err != nil {
+	if err := json.Unmarshal(ctx.PostBody(), &threadModel); err != nil {
 		log.Print(err)
-		http.Error(w, "can't decode user data from body", http.StatusBadRequest)
+		ctx.Error("can't decode user data from body", http.StatusBadRequest)
 		return
 	}
 
@@ -39,84 +38,87 @@ func (uh ThreadHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	err := uh.ThreadUC.Create(&threadModel)
 
-	w.Header().Set("Content-Type", "application/json")
+	ctx.Response.Header.Set("Content-Type", "application/json")
 
 	switch err {
 	case models.SameThreadExists:
 		log.Print(err)
 		//threadModel.Votes = 0
-		w.WriteHeader(http.StatusConflict)
+		ctx.SetStatusCode(http.StatusConflict)
 	case models.ForumNotFound:
 		fallthrough
 	case models.UserNotFound:
 		log.Print(err)
-		w.WriteHeader(http.StatusNotFound)
-		helpers.EncodeAndSend(models.Message{Msg: err.Error()}, w)
+		ctx.SetStatusCode(http.StatusNotFound)
+		if err := json.NewEncoder(ctx.Response.BodyWriter()).Encode(models.Message{Msg: err.Error()}); err != nil {
+			log.Print(err)
+			ctx.Error("failed to encode data to json", http.StatusInternalServerError)
+		}
 		return
 	case nil:
-		w.WriteHeader(http.StatusCreated)
+		ctx.SetStatusCode(http.StatusCreated)
 	default:
 		log.Print(err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		ctx.Error(err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	if err := json.NewEncoder(w).Encode(threadModel); err != nil {
+	if err := json.NewEncoder(ctx.Response.BodyWriter()).Encode(threadModel); err != nil {
 		log.Print(err)
-		http.Error(w, "failed to encode thread to json", http.StatusInternalServerError)
+		ctx.Error("failed to encode thread to json", http.StatusInternalServerError)
 		return
 	}
 }
 
-func (uh ThreadHandler) GetThreadsByForum(w http.ResponseWriter, r *http.Request) {
-	slug, ok := mux.Vars(r)["slug"]
+func (uh ThreadHandler) GetThreadsByForum(ctx *fasthttp.RequestCtx) {
+	slug, ok := ctx.UserValue("slug").(string)
 	if !ok {
 		log.Print("no slug in vars")
-		http.Error(w, "no slug in vars", http.StatusBadRequest)
+		ctx.Error("no slug in vars", http.StatusBadRequest)
 		return
 	}
-	limit, err := strconv.Atoi(r.URL.Query().Get("limit"))
+	limit, err := ctx.URI().QueryArgs().GetUint("limit")
 	if err != nil {
 		limit = 0
 	}
 
-	since, err := time.Parse("2006-01-02T15:04:05.000Z", r.URL.Query().Get("since"))
+	since, err := time.Parse("2006-01-02T15:04:05.000Z", string(ctx.URI().QueryArgs().Peek("since")))
 
-	desc, err := strconv.ParseBool(r.URL.Query().Get("desc"))
-	if err != nil {
-		desc = false
-	}
+	desc := ctx.URI().QueryArgs().GetBool("desc")
 
 	threads, err := uh.ThreadUC.GetForumsThreads(slug, limit, since, desc)
 
-	w.Header().Set("Content-Type", "application/json")
+	ctx.Response.Header.Set("Content-Type", "application/json")
 
 	switch err {
 	case models.ForumNotFound:
 		log.Print(err)
-		w.WriteHeader(http.StatusNotFound)
-		helpers.EncodeAndSend(models.Message{Msg: err.Error()}, w)
+		ctx.SetStatusCode(http.StatusNotFound)
+		if err := json.NewEncoder(ctx.Response.BodyWriter()).Encode(models.Message{Msg: err.Error()}); err != nil {
+			log.Print(err)
+			ctx.Error("failed to encode data to json", http.StatusInternalServerError)
+		}
 		return
 	case nil:
 		break
 	default:
 		log.Print(err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		ctx.Error(err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	if err := json.NewEncoder(w).Encode(threads); err != nil {
+	if err := json.NewEncoder(ctx.Response.BodyWriter()).Encode(threads); err != nil {
 		log.Print(err)
-		http.Error(w, "failed to encode threads to json", http.StatusInternalServerError)
+		ctx.Error("failed to encode threads to json", http.StatusInternalServerError)
 		return
 	}
 }
 
-func (uh ThreadHandler) Update(w http.ResponseWriter, r *http.Request) {
-	slugOrID, ok := mux.Vars(r)["slug_or_id"]
+func (uh ThreadHandler) Update(ctx *fasthttp.RequestCtx) {
+	slugOrID, ok := ctx.UserValue("slug_or_id").(string)
 	if !ok {
 		log.Print("no slug in vars")
-		http.Error(w, "no slug in vars", http.StatusBadRequest)
+		ctx.Error("no slug in vars", http.StatusBadRequest)
 		return
 	}
 
@@ -126,42 +128,45 @@ func (uh ThreadHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	threadModel := models.Thread{}
-	if err := json.NewDecoder(r.Body).Decode(&threadModel); err != nil {
+	if err := json.Unmarshal(ctx.PostBody(), &threadModel); err != nil {
 		log.Print(err)
-		http.Error(w, "can't decode user data from body", http.StatusBadRequest)
+		ctx.Error("can't decode user data from body", http.StatusBadRequest)
 		return
 	}
 
 	threads, err := uh.ThreadUC.Update(int32(threadID), slugOrID, threadModel.Message, threadModel.Title)
 
-	w.Header().Set("Content-Type", "application/json")
+	ctx.Response.Header.Set("Content-Type", "application/json")
 
 	switch err {
 	case models.ThreadNotFound:
 		log.Print(err)
-		w.WriteHeader(http.StatusNotFound)
-		helpers.EncodeAndSend(models.Message{Msg: err.Error()}, w)
+		ctx.SetStatusCode(http.StatusNotFound)
+		if err := json.NewEncoder(ctx.Response.BodyWriter()).Encode(models.Message{Msg: err.Error()}); err != nil {
+			log.Print(err)
+			ctx.Error("failed to encode data to json", http.StatusInternalServerError)
+		}
 		return
 	case nil:
 		break
 	default:
 		log.Print(err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		ctx.Error(err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	if err := json.NewEncoder(w).Encode(threads); err != nil {
+	if err := json.NewEncoder(ctx.Response.BodyWriter()).Encode(threads); err != nil {
 		log.Print(err)
-		http.Error(w, "failed to encode threads to json", http.StatusInternalServerError)
+		ctx.Error("failed to encode threads to json", http.StatusInternalServerError)
 		return
 	}
 }
 
-func (uh ThreadHandler) Vote(w http.ResponseWriter, r *http.Request) {
-	slugOrID, ok := mux.Vars(r)["slug_or_id"]
+func (uh ThreadHandler) Vote(ctx *fasthttp.RequestCtx) {
+	slugOrID, ok := ctx.UserValue("slug_or_id").(string)
 	if !ok {
 		log.Print("no slugOrID in vars")
-		http.Error(w, "no slugOrID in vars", http.StatusBadRequest)
+		ctx.Error("no slugOrID in vars", http.StatusBadRequest)
 		return
 	}
 
@@ -171,44 +176,47 @@ func (uh ThreadHandler) Vote(w http.ResponseWriter, r *http.Request) {
 	}
 
 	voteModel := models.Vote{}
-	if err := json.NewDecoder(r.Body).Decode(&voteModel); err != nil {
+	if err := json.Unmarshal(ctx.PostBody(), &voteModel); err != nil {
 		log.Print(err)
-		http.Error(w, "can't decode user data from body", http.StatusBadRequest)
+		ctx.Error("can't decode user data from body", http.StatusBadRequest)
 		return
 	}
 
 	dbThread, err := uh.ThreadUC.Vote(voteModel, slugOrID, int32(id))
 
-	w.Header().Set("Content-Type", "application/json")
+	ctx.Response.Header.Set("Content-Type", "application/json")
 
 	switch err {
 	case models.UserNotFound:
 		fallthrough
 	case models.ThreadNotFound:
 		log.Print(err)
-		w.WriteHeader(http.StatusNotFound)
-		helpers.EncodeAndSend(models.Message{Msg: err.Error()}, w)
+		ctx.SetStatusCode(http.StatusNotFound)
+		if err := json.NewEncoder(ctx.Response.BodyWriter()).Encode(models.Message{Msg: err.Error()}); err != nil {
+			log.Print(err)
+			ctx.Error("failed to encode data to json", http.StatusInternalServerError)
+		}
 		return
 	case nil:
 		break
 	default:
 		log.Print(err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		ctx.Error(err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	if err := json.NewEncoder(w).Encode(dbThread); err != nil {
+	if err := json.NewEncoder(ctx.Response.BodyWriter()).Encode(dbThread); err != nil {
 		log.Print(err)
-		http.Error(w, "failed to encode thread to json", http.StatusInternalServerError)
+		ctx.Error("failed to encode thread to json", http.StatusInternalServerError)
 		return
 	}
 }
 
-func (uh ThreadHandler) Get(w http.ResponseWriter, r *http.Request) {
-	slugOrID, ok := mux.Vars(r)["slug_or_id"]
+func (uh ThreadHandler) Get(ctx *fasthttp.RequestCtx) {
+	slugOrID, ok := ctx.UserValue("slug_or_id").(string)
 	if !ok {
 		log.Print("no slugOrID in vars")
-		http.Error(w, "no slugOrID in vars", http.StatusBadRequest)
+		ctx.Error("no slugOrID in vars", http.StatusBadRequest)
 		return
 	}
 
@@ -219,25 +227,28 @@ func (uh ThreadHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 	dbThread, err := uh.ThreadUC.GetThread(slugOrID, int32(id))
 
-	w.Header().Set("Content-Type", "application/json")
+	ctx.Response.Header.Set("Content-Type", "application/json")
 
 	switch err {
 	case models.ThreadNotFound:
 		log.Print(err)
-		w.WriteHeader(http.StatusNotFound)
-		helpers.EncodeAndSend(models.Message{Msg: err.Error()}, w)
+		ctx.SetStatusCode(http.StatusNotFound)
+		if err := json.NewEncoder(ctx.Response.BodyWriter()).Encode(models.Message{Msg: err.Error()}); err != nil {
+			log.Print(err)
+			ctx.Error("failed to encode data to json", http.StatusInternalServerError)
+		}
 		return
 	case nil:
 		break
 	default:
 		log.Print(err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		ctx.Error(err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	if err := json.NewEncoder(w).Encode(dbThread); err != nil {
+	if err := json.NewEncoder(ctx.Response.BodyWriter()).Encode(dbThread); err != nil {
 		log.Print(err)
-		http.Error(w, "failed to encode thread to json", http.StatusInternalServerError)
+		ctx.Error("failed to encode thread to json", http.StatusInternalServerError)
 		return
 	}
 }

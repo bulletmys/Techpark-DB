@@ -11,4 +11,5 @@ type Post struct {
 	Message  string    `json:"message"`
 	Parent   int64     `json:"parent"`
 	Thread   int32     `json:"thread"`
+	Path     []int64   `json:"-"`
 }

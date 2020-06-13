@@ -63,8 +63,8 @@ DECLARE
 BEGIN
     update forums set posts = posts + 1 where NEW.forum = slug;
     IF (NEW.parent <> 0) THEN
-        parentArray := (select path from posts where id = NEW.parent);
-        NEW.path = parentArray || currval('posts_id_seq');
+--         parentArray := (select path from posts where id = NEW.parent);
+        NEW.path = NEW.path || currval('posts_id_seq');
     else
         NEW.path = ARRAY [currval('posts_id_seq')];
     end if;
@@ -159,7 +159,7 @@ CREATE INDEX IF NOT EXISTS index_threads_forum ON threads (forum);
 CREATE INDEX IF NOT EXISTS index_threads_slug_id ON threads (slug, id);
 -- CREATE INDEX IF NOT EXISTS index_posts_thread_id_parent ON posts (thread, id) WHERE parent = 0;
 CREATE INDEX IF NOT EXISTS index_posts_thread_id ON posts (id, thread);
-CREATE INDEX IF NOT EXISTS index_posts_thread_path_first ON posts (thread, (path[1]), id);
+-- CREATE INDEX IF NOT EXISTS index_posts_thread_path_first ON posts (thread, (path[1]), id);
 CREATE INDEX IF NOT EXISTS index_threads_slug ON threads (slug);
 -- CREATE INDEX IF NOT EXISTS index_posts_thread_id_triple ON posts (id, created, thread);
 CREATE UNIQUE INDEX IF NOT EXISTS index_votes_thread_nickname ON votes (thread, nick);

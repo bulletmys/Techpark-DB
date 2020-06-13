@@ -19,7 +19,7 @@ func (db DBRepository) Create(posts []*models.Post) error {
 	for _, elem := range posts {
 		var id int64
 		err := db.Conn.QueryRow(
-			"insert into posts(nick, message, parent, thread, forum, isEdited, created) values($1, $2, $3, $4, $5, $6, $7) returning id",
+			"insert into posts(nick, message, parent, thread, forum, isEdited, created, path) values($1, $2, $3, $4, $5, $6, $7, $8) returning id",
 			elem.Author,
 			elem.Message,
 			elem.Parent,
@@ -27,6 +27,7 @@ func (db DBRepository) Create(posts []*models.Post) error {
 			elem.Forum,
 			elem.IsEdited,
 			elem.Created,
+			elem.Path,
 		).Scan(&id)
 		if err != nil {
 			return fmt.Errorf("failed to create posts: %v", err)
@@ -38,19 +39,21 @@ func (db DBRepository) Create(posts []*models.Post) error {
 }
 
 func (db DBRepository) CheckParentPostsByID(posts []*models.Post) error {
-	for _, elem := range posts {
+	for i, elem := range posts {
+		s := make([]int64, 0)
 		if elem.Parent == 0 {
 			continue
 		}
 		var dbID int64
 		err := db.Conn.QueryRow(
-			"select id from posts where id = $1 and thread = $2",
+			"select id, path from posts where id = $1 and thread = $2",
 			elem.Parent,
 			elem.Thread,
-		).Scan(&dbID)
+		).Scan(&dbID, &s)
 		if err != nil {
 			return err
 		}
+		posts[i].Path = s
 	}
 
 	return nil

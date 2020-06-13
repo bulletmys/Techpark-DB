@@ -37,7 +37,7 @@ func (db DBRepository) Create(posts []*models.Post) error {
 	return nil
 }
 
-func (db DBRepository) FindPostsByID(posts []*models.Post) error {
+func (db DBRepository) CheckParentPostsByID(posts []*models.Post) error {
 	for _, elem := range posts {
 		if elem.Parent == 0 {
 			continue
@@ -49,7 +49,7 @@ func (db DBRepository) FindPostsByID(posts []*models.Post) error {
 			elem.Thread,
 		).Scan(&dbID)
 		if err != nil {
-			return fmt.Errorf("failed to find posts: %v", err)
+			return err
 		}
 	}
 

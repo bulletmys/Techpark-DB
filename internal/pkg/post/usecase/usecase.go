@@ -17,7 +17,7 @@ type PostUC struct {
 }
 
 func (uc PostUC) Create(posts []*models.Post, slug string, id int32) error {
-	threadID, forum := uc.ThreadRepo.FindAndGetID(slug, id)
+	threadID, f := uc.ThreadRepo.FindAndGetID(slug, id)
 	if threadID == -1 {
 		return models.ThreadNotFound
 	}
@@ -32,17 +32,13 @@ func (uc PostUC) Create(posts []*models.Post, slug string, id int32) error {
 		elem.Thread = threadID
 		elem.Created = created
 		elem.IsEdited = false
-		elem.Forum = forum
-		dbUser, err := uc.UserRepo.FindUserByNickname(elem.Author)
-		if err != nil {
-			return err
-		}
-		if dbUser == nil {
+		elem.Forum = f
+		if dbUser, _ := uc.UserRepo.FindUserByNickname(elem.Author); dbUser == nil {
 			return models.UserNotFound
 		}
 	}
 
-	if err := uc.PostRepo.FindPostsByID(posts); err != nil {
+	if err := uc.PostRepo.CheckParentPostsByID(posts); err != nil {
 		return models.PostNotFound
 	}
 	return uc.PostRepo.Create(posts)
@@ -130,7 +126,7 @@ func (uc PostUC) Update(id int64, msg string) (*models.Post, error) {
 	if dbPost == nil {
 		return nil, models.PostNotFound
 	}
-	if msg != "" && msg != dbPost.Message{
+	if msg != "" && msg != dbPost.Message {
 		dbPost.Message = msg
 		dbPost.IsEdited = true
 		err = uc.PostRepo.UpdatePost(id, msg)

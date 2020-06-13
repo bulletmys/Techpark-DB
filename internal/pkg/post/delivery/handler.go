@@ -41,7 +41,8 @@ func (uh PostHandler) Create(ctx *fasthttp.RequestCtx) {
 	}
 	t1 := time.Now().Nanosecond()
 	err = uh.PostUC.Create(posts, slugOrID, int32(threadID))
-	log.Println("CREATE_TIME_POSTS", time.Now().Nanosecond()-t1)
+	t2 := time.Now().Nanosecond() - t1
+	log.Println("CREATE_TIME_POSTS", t2)
 
 	ctx.Response.Header.Set("Content-Type", "application/json")
 

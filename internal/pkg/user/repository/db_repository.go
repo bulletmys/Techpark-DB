@@ -22,7 +22,7 @@ func (db DBRepository) FindUserByNickname(nick string) (*models.User, error) {
 	var userModel models.User
 
 	err := db.Conn.QueryRow(
-		"select nick, name, email, about from users where lower(nick) = $1",
+		"select nick, name, email, about from users where nick = $1",
 		strings.ToLower(nick),
 	).Scan(&userModel.Nickname, &userModel.FullName, &userModel.Email, &userModel.About)
 

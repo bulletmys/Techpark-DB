@@ -40,19 +40,18 @@ func (db DBRepository) Create(posts []*models.Post) error {
 
 func (db DBRepository) CheckParentPostByID(post *models.Post) error {
 	s := make([]int64, 0)
+	var thr int32
 
 	if post.Parent == 0 {
 		return nil
 	}
 
 	err := db.Conn.QueryRow(
-		"select path from posts where id = $1 and thread = $2",
+		"select path, thread from posts where id = $1",
 		post.Parent,
-		post.Thread,
-	).Scan(&s)
+	).Scan(&s, &thr)
 
-	if err != nil {
-		fmt.Println("DANGER, ERROR!", err)
+	if err != nil || thr != post.Thread{
 		return err
 	}
 	post.Path = s

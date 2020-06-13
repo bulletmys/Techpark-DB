@@ -48,9 +48,6 @@ func (uc PostUC) Create(posts []*models.Post, slug string, id int32) error {
 			return models.PostNotFound
 		}
 	}
-	//if err := uc.PostRepo.CheckParentPostsByID(posts); err != nil {
-	//	return models.PostNotFound
-	//}
 
 	return uc.PostRepo.Create(posts)
 }

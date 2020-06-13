@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"techpark_db/internal/pkg/models"
 	"techpark_db/internal/pkg/post"
+	"time"
 )
 
 type PostHandler struct {
@@ -38,8 +39,9 @@ func (uh PostHandler) Create(ctx *fasthttp.RequestCtx) {
 		ctx.Error("can't decode posts data from body", http.StatusBadRequest)
 		return
 	}
-
+	t1 := time.Now().Nanosecond()
 	err = uh.PostUC.Create(posts, slugOrID, int32(threadID))
+	log.Println("CREATE_TIME_POSTS", time.Now().Nanosecond()-t1)
 
 	ctx.Response.Header.Set("Content-Type", "application/json")
 
@@ -165,7 +167,7 @@ func (uh PostHandler) GetDetails(ctx *fasthttp.RequestCtx) {
 	forumFlag := false
 
 	related := ctx.URI().QueryArgs().PeekMulti("related")
-	if related != nil  {
+	if related != nil {
 		related = bytes.Split(related[0], []byte(","))
 	}
 

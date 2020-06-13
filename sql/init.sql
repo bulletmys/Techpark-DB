@@ -153,14 +153,14 @@ $BODY$
 
 
 CREATE UNIQUE INDEX IF NOT EXISTS index_forum_slug  ON forums (slug);
-CREATE INDEX IF NOT EXISTS index_posts_forum ON posts (forum);
+CREATE INDEX IF NOT EXISTS index_posts_forum ON posts (thread);
 -- CREATE INDEX IF NOT EXISTS index_posts_forum_parent ON posts (parent); -- ???
 CREATE INDEX IF NOT EXISTS index_threads_forum ON threads (forum);
 CREATE INDEX IF NOT EXISTS index_posts_thread_id_parent ON posts (thread, id) WHERE parent = 0;
 CREATE INDEX IF NOT EXISTS index_posts_thread_id ON posts (id, thread);
-CREATE INDEX IF NOT EXISTS index_posts_thread_path_first ON posts (thread, (path[1]), id);
+-- CREATE INDEX IF NOT EXISTS index_posts_thread_path_first ON posts (thread, (path[1]), id);
 CREATE INDEX IF NOT EXISTS index_threads_slug ON threads (slug);
-CREATE INDEX IF NOT EXISTS index_posts_thread_id_triple ON posts (id, created, thread);
+-- CREATE INDEX IF NOT EXISTS index_posts_thread_id_triple ON posts (id, created, thread);
 CREATE UNIQUE INDEX IF NOT EXISTS index_votes_thread_nickname ON votes (thread, nick);
 CREATE INDEX IF NOT EXISTS index_posts_thread_path ON posts (thread, path);
 

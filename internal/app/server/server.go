@@ -106,6 +106,6 @@ func StartNew() {
 	fmt.Println("starting server at :5000")
 
 	if err := server.ListenAndServe(); err != nil {
-		log.Fatal("failed to start server")
+		log.Fatal("failed to start server", err)
 	}
 }

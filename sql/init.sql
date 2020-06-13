@@ -165,7 +165,7 @@ CREATE INDEX IF NOT EXISTS index_threads_slug ON threads (slug);
 CREATE UNIQUE INDEX IF NOT EXISTS index_votes_thread_nickname ON votes (thread, nick);
 CREATE INDEX IF NOT EXISTS index_posts_thread_path ON posts (thread, path);
 
-
+--
 -- truncate table votes RESTART IDENTITY cascade;truncate table posts RESTART IDENTITY cascade ;truncate table forums RESTART IDENTITY cascade ;truncate table threads RESTART IDENTITY cascade ;truncate table users RESTART IDENTITY cascade ;
 --
 -- DROP TABLE if exists users cascade;

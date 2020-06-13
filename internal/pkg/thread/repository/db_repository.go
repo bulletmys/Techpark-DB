@@ -110,6 +110,31 @@ func (db DBRepository) FindThreadByID(id int32) (*models.Thread, error) {
 	return &thread, nil
 }
 
+func (db DBRepository) FindAndGetIDBySlug(slug string) (int32, string) {
+	var id int32
+	var forum string
+	err := db.Conn.QueryRow(
+		"select id, forum from threads where slug = $1",
+		strings.ToLower(slug),
+	).Scan(&id, &forum)
+	if err != nil {
+		return -1, ""
+	}
+	return id, forum
+}
+
+func (db DBRepository) FindAndGetIDByID(id int32) (int32, string) {
+	var forum string
+	err := db.Conn.QueryRow(
+		"select id, forum from threads where id = $1",
+		id,
+	).Scan(&id, &forum)
+	if err != nil {
+		return -1, ""
+	}
+	return id, forum
+}
+
 func (db DBRepository) FindAndGetID(slug string, id int32) (int32, string) {
 
 	var forum string

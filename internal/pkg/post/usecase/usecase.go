@@ -17,7 +17,15 @@ type PostUC struct {
 }
 
 func (uc PostUC) Create(posts []*models.Post, slug string, id int32) error {
-	threadID, f := uc.ThreadRepo.FindAndGetID(slug, id)
+	var threadID int32
+	var f string
+
+	if id != -1 {
+		threadID, f = uc.ThreadRepo.FindAndGetIDByID(id)
+	} else {
+		threadID, f = uc.ThreadRepo.FindAndGetIDBySlug(slug)
+	}
+
 	if threadID == -1 {
 		return models.ThreadNotFound
 	}
@@ -36,11 +44,14 @@ func (uc PostUC) Create(posts []*models.Post, slug string, id int32) error {
 		if dbUser, _ := uc.UserRepo.FindUserByNickname(elem.Author); dbUser == nil {
 			return models.UserNotFound
 		}
+		if err := uc.PostRepo.CheckParentPostByID(elem); err != nil {
+			return models.PostNotFound
+		}
 	}
+	//if err := uc.PostRepo.CheckParentPostsByID(posts); err != nil {
+	//	return models.PostNotFound
+	//}
 
-	if err := uc.PostRepo.CheckParentPostsByID(posts); err != nil {
-		return models.PostNotFound
-	}
 	return uc.PostRepo.Create(posts)
 }
 

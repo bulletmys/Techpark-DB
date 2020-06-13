@@ -12,7 +12,7 @@ RUN go build main.go
 # Postgres
 FROM ubuntu:18.04 AS release
 ENV DEBIAN_FRONTEND=noninteractive
-ENV PGVER 11
+ENV PGVER 12
 
 RUN apt-get update && apt-get install -y wget gnupg && \
     wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | apt-key add -
@@ -29,6 +29,7 @@ RUN /etc/init.d/postgresql start &&\
     createdb -O docker docker &&\
     psql -d docker -c "CREATE EXTENSION IF NOT EXISTS citext;" &&\
     psql -d docker -c "set synchronous_commit to 'off';" &&\
+    psql -d docker -c "set random_page_cost to '1';" &&\
 #    psql -d docker -c "alter user docker set shared_buffers='256MB';" &&\
     psql docker -a -f sql/init.sql &&\
     /etc/init.d/postgresql stop

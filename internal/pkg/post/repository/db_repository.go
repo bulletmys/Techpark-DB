@@ -38,6 +38,28 @@ func (db DBRepository) Create(posts []*models.Post) error {
 	return nil
 }
 
+func (db DBRepository) CheckParentPostByID(post *models.Post) error {
+	s := make([]int64, 0)
+
+	if post.Parent == 0 {
+		return nil
+	}
+
+	err := db.Conn.QueryRow(
+		"select path from posts where id = $1 and thread = $2",
+		post.Parent,
+		post.Thread,
+	).Scan(&s)
+
+	if err != nil {
+		fmt.Println("DANGER, ERROR!", err)
+		return err
+	}
+	post.Path = s
+
+	return nil
+}
+
 func (db DBRepository) CheckParentPostsByID(posts []*models.Post) error {
 	for i, elem := range posts {
 		s := make([]int64, 0)

@@ -34,8 +34,9 @@ func StartNew() {
 			TLSConfig:      nil,
 			UseFallbackTLS: false,
 			Database:       "docker",
+			LogLevel:       1,
 		},
-		MaxConnections: 20,
+		MaxConnections: 30,
 
 		AfterConnect:   nil,
 		AcquireTimeout: 0,
@@ -97,9 +98,6 @@ func StartNew() {
 
 	log.Println("starting server at :5000")
 
-	//if err := server.ListenAndServe(); err != nil {
-	//	log.Fatal("failed to start server", err)
-	//}
 	if err := fasthttp.ListenAndServe(":5000", r.Handler); err != nil {
 		log.Fatalf("Error in ListenAndServe: %s", err)
 	}

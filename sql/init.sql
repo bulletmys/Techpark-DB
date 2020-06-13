@@ -154,14 +154,13 @@ $BODY$
 
 CREATE UNIQUE INDEX IF NOT EXISTS index_forum_slug  ON forums (slug);
 CREATE INDEX IF NOT EXISTS index_posts_forum ON posts (forum);
-CREATE INDEX IF NOT EXISTS index_posts_forum ON posts (parent); -- ???
+-- CREATE INDEX IF NOT EXISTS index_posts_forum_parent ON posts (parent); -- ???
 CREATE INDEX IF NOT EXISTS index_threads_forum ON threads (forum);
-CREATE INDEX IF NOT EXISTS index_threads_slug_id ON threads (slug, id);
--- CREATE INDEX IF NOT EXISTS index_posts_thread_id_parent ON posts (thread, id) WHERE parent = 0;
+CREATE INDEX IF NOT EXISTS index_posts_thread_id_parent ON posts (thread, id) WHERE parent = 0;
 CREATE INDEX IF NOT EXISTS index_posts_thread_id ON posts (id, thread);
--- CREATE INDEX IF NOT EXISTS index_posts_thread_path_first ON posts (thread, (path[1]), id);
+CREATE INDEX IF NOT EXISTS index_posts_thread_path_first ON posts (thread, (path[1]), id);
 CREATE INDEX IF NOT EXISTS index_threads_slug ON threads (slug);
--- CREATE INDEX IF NOT EXISTS index_posts_thread_id_triple ON posts (id, created, thread);
+CREATE INDEX IF NOT EXISTS index_posts_thread_id_triple ON posts (id, created, thread);
 CREATE UNIQUE INDEX IF NOT EXISTS index_votes_thread_nickname ON votes (thread, nick);
 CREATE INDEX IF NOT EXISTS index_posts_thread_path ON posts (thread, path);
 
@@ -173,3 +172,68 @@ CREATE INDEX IF NOT EXISTS index_posts_thread_path ON posts (thread, path);
 -- DROP TABLE if exists threads cascade;
 -- DROP TABLE if exists posts cascade;
 -- DROP TABLE if exists votes;
+--
+-- SELECT
+--   relname,
+--   seq_scan - idx_scan AS too_much_seq,
+--   CASE
+--     WHEN
+--       seq_scan - coalesce(idx_scan, 0) > 0
+--     THEN
+--       'Missing Index?'
+--     ELSE
+--       'OK'
+--   END,
+--   pg_relation_size(relname::regclass) AS rel_size, seq_scan, idx_scan
+-- FROM
+--   pg_stat_all_tables
+-- WHERE
+--   schemaname = 'public'
+--   AND pg_relation_size(relname::regclass) > 80000
+-- ORDER BY
+--   too_much_seq DESC;
+--
+-- SELECT
+--   indexrelid::regclass as index,
+--   relid::regclass as table,
+--   'DROP INDEX ' || indexrelid::regclass || ';' as drop_statement
+-- FROM
+--   pg_stat_user_indexes
+--   JOIN
+--     pg_index USING (indexrelid)
+-- WHERE
+--   idx_scan = 0
+--   AND indisunique is false;
+
+ALTER SYSTEM SET
+    max_connections = '200';
+ALTER SYSTEM SET
+    shared_buffers = '256MB';
+ALTER SYSTEM SET
+    effective_cache_size = '768MB';
+ALTER SYSTEM SET
+    maintenance_work_mem = '64MB';
+ALTER SYSTEM SET
+    checkpoint_completion_target = '0.7';
+ALTER SYSTEM SET
+    wal_buffers = '7864kB';
+ALTER SYSTEM SET
+    default_statistics_target = '100';
+ALTER SYSTEM SET
+    random_page_cost = '1.1';
+ALTER SYSTEM SET
+    effective_io_concurrency = '200';
+ALTER SYSTEM SET
+    work_mem = '1310kB';
+ALTER SYSTEM SET
+    min_wal_size = '1GB';
+ALTER SYSTEM SET
+    max_wal_size = '4GB';
+ALTER SYSTEM SET
+    max_worker_processes = '2';
+ALTER SYSTEM SET
+    max_parallel_workers_per_gather = '1';
+ALTER SYSTEM SET
+    max_parallel_workers = '2';
+ALTER SYSTEM SET
+    max_parallel_maintenance_workers = '1';

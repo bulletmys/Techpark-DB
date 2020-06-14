@@ -20,7 +20,7 @@ CREATE UNLOGGED TABLE forums
 CREATE UNLOGGED TABLE threads
 (
     nick    CITEXT  NOT NULL REFERENCES users (nick),
-    created timestamptz,
+    created timestamptz(6),
     forum   CITEXT  NOT NULL REFERENCES forums (slug),
     id      BIGSERIAL PRIMARY KEY,
     message VARCHAR NOT NULL,
@@ -46,7 +46,7 @@ EXECUTE PROCEDURE after_thread_insert_func();
 CREATE UNLOGGED TABLE posts
 (
     nick     CITEXT  NOT NULL REFERENCES users (nick),
-    created  timestamptz,
+    created  timestamptz(6),
     forum    CITEXT  NOT NULL REFERENCES forums (slug),
     id       BIGSERIAL PRIMARY KEY,
     isEdited bool    NOT NULL,
@@ -164,9 +164,9 @@ CREATE INDEX IF NOT EXISTS index_threads_slug ON threads (slug);
 CREATE UNIQUE INDEX IF NOT EXISTS index_votes_thread_nickname ON votes (thread, nick);
 CREATE INDEX IF NOT EXISTS index_posts_thread_path ON posts (thread, path);
 
---
+-- --
 -- truncate table votes RESTART IDENTITY cascade;truncate table posts RESTART IDENTITY cascade ;truncate table forums RESTART IDENTITY cascade ;truncate table threads RESTART IDENTITY cascade ;truncate table users RESTART IDENTITY cascade ;
---
+-- -- --
 -- DROP TABLE if exists users cascade;
 -- DROP TABLE if exists forums cascade;
 -- DROP TABLE if exists threads cascade;

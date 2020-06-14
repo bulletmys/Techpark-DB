@@ -21,6 +21,19 @@ import (
 	userUC "techpark_db/internal/pkg/user/usecase"
 )
 
+var er int64
+
+func CheckReq(next fasthttp.RequestHandler) fasthttp.RequestHandler {
+	return func(ctx *fasthttp.RequestCtx) {
+		er++
+		log.Println(er, " Req URI:", ctx.Request.URI().String())
+		log.Println(er, " Req Body:", string(ctx.Request.Body()))
+
+		next(ctx)
+		log.Println(er, " Resp Body:", string(ctx.Response.Body()))
+	}
+}
+
 func StartNew() {
 	r := router.New()
 
@@ -37,7 +50,6 @@ func StartNew() {
 			LogLevel:       1,
 		},
 		MaxConnections: 30,
-
 		AfterConnect:   nil,
 		AcquireTimeout: 0,
 	})
@@ -98,7 +110,7 @@ func StartNew() {
 
 	log.Println("starting server at :5000")
 
-	if err := fasthttp.ListenAndServe(":5000", r.Handler); err != nil {
+	if err := fasthttp.ListenAndServe(":5000", CheckReq(r.Handler)); err != nil {
 		log.Fatalf("Error in ListenAndServe: %s", err)
 	}
 }

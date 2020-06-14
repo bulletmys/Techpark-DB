@@ -34,7 +34,7 @@ func (uc PostUC) Create(posts []*models.Post, slug string, id int32) error {
 		return nil
 	}
 
-	created := time.Now()
+	created := time.Now().Truncate(time.Microsecond)
 
 	for _, elem := range posts {
 		elem.Thread = threadID

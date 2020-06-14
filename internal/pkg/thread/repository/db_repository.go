@@ -7,7 +7,6 @@ import (
 	"strconv"
 	"strings"
 	"techpark_db/internal/pkg/models"
-	"time"
 )
 
 type DBRepository struct {
@@ -206,7 +205,7 @@ func (db DBRepository) FindBySlugOrID(slug string, id int32) (*models.Thread, er
 	return &thread, nil
 }
 
-func (db DBRepository) GetThreadsByForum(forumSlug string, limit int, since time.Time, desc bool) ([]models.Thread, error) {
+func (db DBRepository) GetThreadsByForum(forumSlug string, limit int, since string, desc bool) ([]models.Thread, error) {
 	flag := false
 	query := getThreadsQueryConfigurator(limit, since, desc, &flag)
 
@@ -263,15 +262,15 @@ func (db DBRepository) GetThreadsByForum(forumSlug string, limit int, since time
 	return threads, nil
 }
 
-func getThreadsQueryConfigurator(limit int, since time.Time, desc bool, flag *bool) string {
+func getThreadsQueryConfigurator(limit int, since string, desc bool, flag *bool) string {
 	query := "select nick, created, forum, id, message, slug, title, votes from threads where forum = $1"
 
-	if !since.IsZero() {
+	if since != "" {
 		*flag = true
 		if desc {
-			query += " and created <= $2"
+			query += " and created <= $2::TEXT::TIMESTAMPTZ "
 		} else {
-			query += " and created >= $2"
+			query += " and created >= $2::TEXT::TIMESTAMPTZ "
 		}
 	}
 

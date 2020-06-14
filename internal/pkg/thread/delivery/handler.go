@@ -8,7 +8,6 @@ import (
 	"strconv"
 	"techpark_db/internal/pkg/models"
 	"techpark_db/internal/pkg/thread"
-	"time"
 )
 
 type ThreadHandler struct {
@@ -82,7 +81,8 @@ func (uh ThreadHandler) GetThreadsByForum(ctx *fasthttp.RequestCtx) {
 		limit = 0
 	}
 
-	since, err := time.Parse("2006-01-02T15:04:05.000Z", string(ctx.URI().QueryArgs().Peek("since")))
+	//since, err := time.Parse("2006-01-02T15:04:05.000Z", string(ctx.URI().QueryArgs().Peek("since")))
+	since := string(ctx.URI().QueryArgs().Peek("since"))
 
 	desc := ctx.URI().QueryArgs().GetBool("desc")
 

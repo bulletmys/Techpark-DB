@@ -2,7 +2,6 @@ package thread
 
 import (
 	"techpark_db/internal/pkg/models"
-	"time"
 )
 
 type Repository interface {
@@ -15,5 +14,5 @@ type Repository interface {
 	FindAndGetIDByID(id int32) (int32, string)
 	FindAndGetIDBySlug(slug string) (int32, string)
 	FindThreadByID(id int32) (*models.Thread, error)
-	GetThreadsByForum(forumSlug string, limit int, since time.Time, desc bool) ([]models.Thread, error)
+	GetThreadsByForum(forumSlug string, limit int, since string, desc bool) ([]models.Thread, error)
 }

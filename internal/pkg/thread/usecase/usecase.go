@@ -6,7 +6,6 @@ import (
 	"techpark_db/internal/pkg/models"
 	"techpark_db/internal/pkg/thread"
 	"techpark_db/internal/pkg/user"
-	"time"
 )
 
 type ThreadUC struct {
@@ -53,7 +52,7 @@ func (uc ThreadUC) Create(thread *models.Thread) error {
 	return nil
 }
 
-func (uc ThreadUC) GetForumsThreads(forumSlug string, limit int, since time.Time, desc bool) ([]models.Thread, error) {
+func (uc ThreadUC) GetForumsThreads(forumSlug string, limit int, since string, desc bool) ([]models.Thread, error) {
 	dbForum, err := uc.ForumRepo.FindForumBySlug(forumSlug)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find forum by slug: %v", err)

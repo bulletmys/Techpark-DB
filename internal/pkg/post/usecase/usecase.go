@@ -1,6 +1,7 @@
 package usecase
 
 import (
+	"fmt"
 	"techpark_db/internal/pkg/forum"
 	"techpark_db/internal/pkg/models"
 	"techpark_db/internal/pkg/post"
@@ -65,13 +66,37 @@ func (uc PostUC) Find(slug string, threadId, limit int32, since int64, desc bool
 
 	switch sortType {
 	case post.FLAT:
-		posts, err = uc.PostRepo.FindPostsFlat(dbThread.ID, limit, since, desc, false)
+		//posts, err = uc.PostRepo.FindPostsFlat(dbThread.ID, limit, since, desc, false)
+		posts, err = uc.PostRepo.GetThreadPostsDB(
+			limit,
+			since,
+			"flat",
+			fmt.Sprint(desc),
+			dbThread.ID)
 	case post.TREE:
-		posts, err = uc.PostRepo.FindPostsFlat(dbThread.ID, limit, since, desc, true)
+		//posts, err = uc.PostRepo.FindPostsFlat(dbThread.ID, limit, since, desc, true)
+		posts, err = uc.PostRepo.GetThreadPostsDB(
+			limit,
+			since,
+			"tree",
+			fmt.Sprint(desc),
+			dbThread.ID)
 	case post.PARENT_TREE:
-		posts, err = uc.PostRepo.FindPostsParentTree(dbThread.ID, limit, since, desc)
+		//posts, err = uc.PostRepo.FindPostsParentTree(dbThread.ID, limit, since, desc)
+		posts, err = uc.PostRepo.GetThreadPostsDB(
+			limit,
+			since,
+			"parent_tree",
+			fmt.Sprint(desc),
+			dbThread.ID)
 	default:
-		posts, err = uc.PostRepo.FindPosts(dbThread.ID, limit, since, desc)
+		posts, err = uc.PostRepo.GetThreadPostsDB(
+			limit,
+			since,
+			"flat",
+			fmt.Sprint(desc),
+			dbThread.ID)
+		//posts, err = uc.PostRepo.FindPosts(dbThread.ID, limit, since, desc)
 	}
 
 	if err != nil {

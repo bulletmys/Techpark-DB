@@ -73,7 +73,6 @@ func (db DBRepository) FindUser(user models.User) ([]models.User, error) {
 
 func (db DBRepository) Create(user models.User) error {
 
-
 	_, err := db.Conn.Exec(
 		"insert into users(nick, name, email, about) values($1, $2, $3, $4)",
 		user.Nickname,
@@ -89,7 +88,6 @@ func (db DBRepository) Create(user models.User) error {
 }
 
 func (db DBRepository) FindUserByEmail(email string) (*models.User, error) {
-
 
 	var userModel models.User
 
@@ -122,7 +120,6 @@ func (db DBRepository) UpdateUser(user models.User) error {
 
 func (db DBRepository) GetForumUsers(slug, since string, limit int, desc bool) ([]models.User, error) {
 
-
 	args := make([]interface{}, 1)
 	args[0] = strings.ToLower(slug)
 
@@ -143,6 +140,60 @@ func (db DBRepository) GetForumUsers(slug, since string, limit int, desc bool) (
 		}
 	}
 	query += " group by u.nick) as ftpu order by lower(nick)"
+
+	if desc {
+		query += " desc "
+	}
+
+	if limit > 0 {
+		query += "limit " + strconv.Itoa(limit)
+	}
+
+	rows, err := db.Conn.Query(
+		query,
+		args...
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get users: %v", err)
+	}
+	users := make([]models.User, 0)
+
+	for rows.Next() {
+		userModel := models.User{}
+		if err := rows.Scan(&userModel.Nickname, &userModel.FullName, &userModel.Email, &userModel.About); err != nil {
+			return nil, err
+		}
+		users = append(users, userModel)
+	}
+
+	if len(users) == 0 {
+		return []models.User{}, nil
+	}
+
+	return users, nil
+}
+
+func (db DBRepository) GetForumUsers2(slug, since string, limit int, desc bool) ([]models.User, error) {
+
+	args := make([]interface{}, 1)
+	args[0] = strings.ToLower(slug)
+
+	query := `SELECT DISTINCT ON (u.nick COLLATE "C") u.nick, u.name, u.email, u.about FROM users u WHERE nick IN (
+		SELECT nick FROM threads WHERE forum = $1
+	  UNION ALL
+	  SELECT nick FROM posts WHERE forum = $1
+	)`
+
+	if since != "" {
+		args = append(args, since)
+		query += ` AND nick COLLATE "C" `
+		if desc {
+			query += "< $2"
+		} else {
+			query += "> $2"
+		}
+	}
+	query += ` ORDER BY (u.nick COLLATE "C")`
 
 	if desc {
 		query += " desc "

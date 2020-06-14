@@ -17,6 +17,19 @@ func newDBRepository(conn *pgx.ConnPool) *DBRepository {
 	return &DBRepository{Conn: conn}
 }
 
+var queryPostsNoSience = map[string]map[string]string{
+	"true": map[string]string{
+		"tree":        getPostsDescLimitTreeSQL,
+		"parent_tree": getPostsDescLimitParentTreeSQL,
+		"flat":        getPostsDescLimitFlatSQL,
+	},
+	"false": map[string]string{
+		"tree":        getPostsLimitTreeSQL,
+		"parent_tree": getPostsLimitParentTreeSQL,
+		"flat":        getPostsLimitFlatSQL,
+	},
+}
+
 func (db DBRepository) Create(posts []*models.Post) error {
 	for _, elem := range posts {
 		var id int64
@@ -384,3 +397,181 @@ func (db DBRepository) UpdatePost(id int64, msg string) error {
 
 	return nil
 }
+
+func (db DBRepository) GetThreadPostsDB(limit int32, since int64, sort, desc string, thread int32) ([]models.Post, error) {
+	var rows *pgx.Rows
+	var err error
+
+	//fmt.Println("SInce:", since)
+	//fmt.Println("thread:", thread)
+	//fmt.Println("Limit:", limit)
+
+	if since > 0 {
+		query := queryPostsWithSience[desc][sort]
+		//log.Print("Query:kek:", query)
+		rows, err = db.Conn.Query(query, thread, since, limit)
+	} else {
+		query := queryPostsNoSience[desc][sort]
+		//log.Print("Query:kek:since", query)
+		rows, err = db.Conn.Query(query, thread, limit)
+	}
+	//fmt.Println("Query:kek:rowsss", rows)
+
+	if err != nil {
+		return nil, err
+	}
+
+	defer rows.Close()
+
+	posts := make([]models.Post, 0)
+	var s sql.NullString
+
+	for rows.Next() {
+		postModel := models.Post{}
+		if err := rows.Scan(
+			&postModel.ID,
+			&postModel.Author,
+			&postModel.Parent,
+			&s,
+			&postModel.Forum,
+			&postModel.Thread,
+			&postModel.Created,
+		); err != nil {
+			return nil, fmt.Errorf("error while scaning query rows: %v", err)
+		}
+
+		if s.Valid {
+			postModel.Message = s.String
+		}
+		posts = append(posts, postModel)
+	}
+	return posts, nil
+}
+
+var queryPostsWithSience = map[string]map[string]string{
+	"true": map[string]string{
+		"tree":        getPostsSienceDescLimitTreeSQL,
+		"parent_tree": getPostsSienceDescLimitParentTreeSQL,
+		"flat":        getPostsSienceDescLimitFlatSQL,
+	},
+	"false": map[string]string{
+		"tree":        getPostsSienceLimitTreeSQL,
+		"parent_tree": getPostsSienceLimitParentTreeSQL,
+		"flat":        getPostsSienceLimitFlatSQL,
+	},
+}
+
+const (
+	// getThreadPosts
+	getPostsSienceDescLimitTreeSQL = `
+		SELECT id, nick, parent, message, forum, thread, created
+		FROM posts
+		WHERE thread = $1 AND (path < (SELECT path FROM posts WHERE id = $2))
+		ORDER BY path DESC
+		LIMIT $3
+	`
+
+	getPostsSienceDescLimitParentTreeSQL = `
+		SELECT id, nick, parent, message, forum, thread, created
+		FROM posts p
+		WHERE p.thread = $1 and p.path[1] IN (
+			SELECT p2.path[1]
+			FROM posts p2
+			WHERE p2.thread = $1 AND p2.parent = 0 and p2.path[1] < (SELECT p3.path[1] from posts p3 where p3.id = $2)
+			ORDER BY p2.path DESC
+			LIMIT $3
+		)
+		ORDER BY p.path[1] DESC, p.path[2:]
+	`
+
+	getPostsSienceDescLimitFlatSQL = `
+		SELECT id, nick, parent, message, forum, thread, created
+		FROM posts
+		WHERE thread = $1 AND id < $2
+		ORDER BY id DESC
+		LIMIT $3
+	`
+
+	getPostsSienceLimitTreeSQL = `
+		SELECT id, nick, parent, message, forum, thread, created
+		FROM posts
+		WHERE thread = $1 AND (path > (SELECT path FROM posts WHERE id = $2))
+		ORDER BY path
+		LIMIT $3
+	`
+
+	getPostsSienceLimitParentTreeSQL = `
+		SELECT id, nick, parent, message, forum, thread, created
+		FROM posts p
+		WHERE p.thread = $1 and p.path[1] IN (
+			SELECT p2.path[1]
+			FROM posts p2
+			WHERE p2.thread = $1 AND p2.parent = 0 and p2.path[1] > (SELECT p3.path[1] from posts p3 where p3.id = $2)
+			ORDER BY p2.path
+			LIMIT $3
+		)
+		ORDER BY p.path
+	`
+	getPostsSienceLimitFlatSQL = `
+		SELECT id, nick, parent, message, forum, thread, created
+		FROM posts
+		WHERE thread = $1 AND id > $2
+		ORDER BY id
+		LIMIT $3
+	`
+	// without sience
+	getPostsDescLimitTreeSQL = `
+		SELECT id, nick, parent, message, forum, thread, created
+		FROM posts
+		WHERE thread = $1 
+		ORDER BY path DESC
+		LIMIT $2
+	`
+	getPostsDescLimitParentTreeSQL = `
+		SELECT id, nick, parent, message, forum, thread, created
+		FROM posts
+		WHERE thread = $1 AND path[1] IN (
+			SELECT path[1]
+			FROM posts
+			WHERE thread = $1
+			GROUP BY path[1]
+			ORDER BY path[1] DESC
+			LIMIT $2
+		)
+		ORDER BY path[1] DESC, path
+	`
+	getPostsDescLimitFlatSQL = `
+		SELECT id, nick, parent, message, forum, thread, created
+		FROM posts
+		WHERE thread = $1
+		ORDER BY id DESC
+		LIMIT $2
+	`
+	getPostsLimitTreeSQL = `
+		SELECT id, nick, parent, message, forum, thread, created
+		FROM posts
+		WHERE thread = $1 
+		ORDER BY path
+		LIMIT $2
+	`
+	getPostsLimitParentTreeSQL = `
+		SELECT id, nick, parent, message, forum, thread, created
+		FROM posts
+		WHERE thread = $1 AND path[1] IN (
+			SELECT path[1] 
+			FROM posts 
+			WHERE thread = $1 
+			GROUP BY path[1]
+			ORDER BY path[1]
+			LIMIT $2
+		)
+		ORDER BY path
+	`
+	getPostsLimitFlatSQL = `
+		SELECT id, nick, parent, message, forum, thread, created
+		FROM posts
+		WHERE thread = $1 
+		ORDER BY id
+		LIMIT $2
+	`
+)

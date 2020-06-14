@@ -19,6 +19,7 @@ import (
 	userDelivery "techpark_db/internal/pkg/user/delivery"
 	userRepo "techpark_db/internal/pkg/user/repository"
 	userUC "techpark_db/internal/pkg/user/usecase"
+	"time"
 )
 
 var er int64
@@ -28,16 +29,17 @@ func CheckReq(next fasthttp.RequestHandler) fasthttp.RequestHandler {
 		er++
 		log.Println(er, " Req URI:", ctx.Request.URI().String())
 		log.Println(er, " Req Body:", string(ctx.Request.Body()))
-
+		t1 := time.Now()
 		next(ctx)
+		duration := time.Since(t1)
 		log.Println(er, " Resp Body:", string(ctx.Response.Body()))
+		log.Println(er, " Resp Time:", duration.Milliseconds())
 	}
 }
 
 func StartNew() {
 	r := router.New()
 
-	//conn, err := pgxpool.Poolect(context.Background(), os.Getenv("DATABASE_URL"))
 	conn, err := pgx.NewConnPool(pgx.ConnPoolConfig{
 		ConnConfig: pgx.ConnConfig{
 			Host:           "localhost",

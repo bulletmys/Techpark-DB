@@ -12,5 +12,6 @@ type Repository interface {
 	FindPosts(thread, limit int32, since int64, desc bool) ([]models.Post, error)
 	GetPost(id int64) (*models.Post, error)
 	UpdatePost(id int64, msg string) error
+	GetThreadPostsDB(limit int32, since int64, sort, desc string, thread int32) ([]models.Post, error)
 	CheckParentPostByID(post *models.Post) error
 }

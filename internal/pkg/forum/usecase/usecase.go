@@ -41,7 +41,7 @@ func (uc ForumUC) GetForumUsers(slug, since string, limit int, desc bool) ([]mod
 	if dbForum == nil {
 		return nil, models.ForumNotFound
 	}
-	return uc.UserRepo.GetForumUsers(slug, since, limit, desc)
+	return uc.UserRepo.GetForumUsers2(slug, since, limit, desc)
 }
 
 func (uc ForumUC) Find(slug string) (*models.Forum, error) {

@@ -1,5 +1,5 @@
 create extension if not exists citext;
-CREATE TABLE users
+CREATE UNLOGGED TABLE users
 (
     nick  CITEXT COLLATE ucs_basic PRIMARY KEY,
     email CITEXT UNIQUE,
@@ -7,7 +7,7 @@ CREATE TABLE users
     about VARCHAR
 );
 
-CREATE TABLE forums
+CREATE UNLOGGED TABLE forums
 (
     slug    CITEXT PRIMARY KEY,
     nick    CITEXT  NOT NULL,
@@ -17,7 +17,7 @@ CREATE TABLE forums
     FOREIGN KEY (nick) REFERENCES users (nick)
 );
 
-CREATE TABLE threads
+CREATE UNLOGGED TABLE threads
 (
     nick    CITEXT  NOT NULL,
     created timestamptz,
@@ -45,7 +45,7 @@ CREATE TRIGGER after_thread_insert
     FOR EACH ROW
 EXECUTE PROCEDURE after_thread_insert_func();
 
-CREATE TABLE posts
+CREATE UNLOGGED TABLE posts
 (
     nick     CITEXT  NOT NULL,
     created  timestamptz,
@@ -83,10 +83,10 @@ CREATE TRIGGER after_post_insert
     FOR EACH ROW
 EXECUTE PROCEDURE after_post_insert_func();
 
-CREATE TABLE votes
+CREATE UNLOGGED TABLE votes
 (
     nick   CITEXT not null,
-    vote   bool   not null,
+    vote   integer   not null,
     thread int4   not null,
     FOREIGN KEY (nick) REFERENCES users (nick),
     FOREIGN KEY (thread) REFERENCES threads (id)
@@ -191,6 +191,46 @@ BEGIN
 END
 $BODY$
     LANGUAGE plpgsql;
+
+-- CREATE INDEX IF NOT EXISTS idx_cover_user on users(nick, name, email, about);
+CREATE INDEX IF NOT EXISTS idx_slug_thread on threads(slug);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_votes_thread_nickname ON votes (thread, nick);
+
+CREATE OR REPLACE FUNCTION insert_vote() RETURNS TRIGGER AS
+$insert_vote$
+BEGIN
+    UPDATE threads
+    SET votes = votes + NEW.vote
+    WHERE id = NEW.thread;
+    RETURN NEW;
+END;
+$insert_vote$
+    LANGUAGE plpgsql;
+DROP TRIGGER IF EXISTS insert_vote ON votes;
+CREATE TRIGGER insert_vote
+    BEFORE INSERT
+    ON votes
+    FOR EACH ROW
+EXECUTE PROCEDURE insert_vote();
+
+
+CREATE OR REPLACE FUNCTION update_vote() RETURNS TRIGGER AS
+$update_vote$
+BEGIN
+    UPDATE threads
+    SET votes = votes - OLD.vote + NEW.vote
+    WHERE id = NEW.thread;
+    RETURN NEW;
+END;
+$update_vote$
+    LANGUAGE plpgsql;
+DROP TRIGGER IF EXISTS update_vote ON votes;
+CREATE TRIGGER update_vote
+    BEFORE UPDATE
+    ON votes
+    FOR EACH ROW
+EXECUTE PROCEDURE update_vote();
+-- CREATE INDEX IF NOT EXISTS idx_cover_thread on threads(nick, created, forum, id, message, slug, title, votes);
 
 
 -- truncate table votes RESTART IDENTITY cascade;truncate table posts RESTART IDENTITY cascade ;truncate table forums RESTART IDENTITY cascade ;truncate table threads RESTART IDENTITY cascade ;truncate table users RESTART IDENTITY cascade ;

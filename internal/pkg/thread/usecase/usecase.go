@@ -68,14 +68,16 @@ func (uc ThreadUC) GetForumsThreads(forumSlug string, limit int, since time.Time
 }
 
 func (uc ThreadUC) Vote(vote models.Vote, slug string, id int32) (*models.Thread, error) {
-	dbUser, err := uc.UserRepo.FindUserByNickname(vote.Nick)
+	err := uc.UserRepo.GetUserNick(vote.Nick)
 	if err != nil {
 		return nil, err
 	}
-	if dbUser == nil {
-		return nil, models.UserNotFound
+	var dbThread *models.Thread
+	if id != -1 {
+		dbThread, err = uc.ThreadRepo.FindThreadByID(id)
+	} else {
+		dbThread, err = uc.ThreadRepo.FindThreadBySlug(slug)
 	}
-	dbThread, err := uc.ThreadRepo.FindBySlugOrID(slug, id)
 	if err != nil {
 		return nil, err
 	}

@@ -18,6 +18,22 @@ func newDBRepository(conn *pgxpool.Pool) *DBRepository {
 	return &DBRepository{Conn: conn}
 }
 
+func (db DBRepository) GetUserNick(nick string) error {
+	conn, err := db.Conn.Acquire(context.Background())
+	if err != nil {
+		return fmt.Errorf("failed to acquire conn: %v", err)
+	}
+	defer conn.Release()
+	var str string
+
+	err = conn.QueryRow(context.Background(),
+		"select nick from users where nick = $1",
+		strings.ToLower(nick),
+	).Scan(&str)
+
+	return err
+}
+
 func (db DBRepository) FindUserByNickname(nick string) (*models.User, error) {
 	conn, err := db.Conn.Acquire(context.Background())
 	if err != nil {
@@ -27,7 +43,7 @@ func (db DBRepository) FindUserByNickname(nick string) (*models.User, error) {
 	var userModel models.User
 
 	err = conn.QueryRow(context.Background(),
-		"select nick, name, email, about from users where lower(nick) = $1",
+		"select nick, name, email, about from users where nick = $1",
 		strings.ToLower(nick),
 	).Scan(&userModel.Nickname, &userModel.FullName, &userModel.Email, &userModel.About)
 

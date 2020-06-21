@@ -12,6 +12,7 @@ RUN go build main.go
 FROM ubuntu:18.04 AS release
 
 ENV PGVER 10
+
 RUN apt -y update && apt install -y postgresql-$PGVER
 
 WORKDIR DB

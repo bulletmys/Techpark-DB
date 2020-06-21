@@ -13,5 +13,6 @@ type Repository interface {
 	FindBySlugOrID(slug string, id int32) (*models.Thread, error)
 	FindThreadBySlug(slug string) (*models.Thread, error)
 	FindThreadByID(id int32) (*models.Thread, error)
+
 	GetThreadsByForum(forumSlug string, limit int, since time.Time, desc bool) ([]models.Thread, error)
 }

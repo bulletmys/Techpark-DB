@@ -71,7 +71,7 @@ func (db DBRepository) FindThreadBySlug(slug string) (*models.Thread, error) {
 	var thread models.Thread
 
 	err = conn.QueryRow(context.Background(),
-		"select nick, created, forum, id, message, slug, title, votes from threads where lower(slug) = $1",
+		"select nick, created, forum, id, message, slug, title, votes from threads where slug = $1",
 		strings.ToLower(slug),
 	).Scan(
 		&thread.Author,
@@ -262,69 +262,25 @@ func (db DBRepository) Vote(vote models.Vote, thread *models.Thread) error {
 	}
 	defer conn.Release()
 
-	userVoice := false
-	if vote.Voice > 0 {
-		userVoice = true
+	tx, txErr := conn.Begin(context.Background())
+	if txErr != nil {
+		return txErr
 	}
-	var userVote bool
-	queryCheck := "select vote from votes where lower(nick) = $1 and thread = $2"
+	defer tx.Rollback(context.Background())
 
-	err = conn.QueryRow(context.Background(),
-		queryCheck,
-		strings.ToLower(vote.Nick),
-		thread.ID,
-	).Scan(&userVote)
-
-	fmt.Println(userVote, userVoice)
-
-	if err == nil && userVote == userVoice {
-		return nil
-	}
-
-	var diff int32 = 1
-	if userVoice != userVote && err != pgx.ErrNoRows {
-		diff = 2
-		_, err = conn.Exec(context.Background(),
-			"update votes set vote = $1 where lower(nick) = $2 and thread = $3",
-			userVoice,
-			strings.ToLower(vote.Nick),
-			thread.ID,
-		)
+	rows, err := tx.Exec(context.Background(), `UPDATE votes SET vote = $1 WHERE thread = $2 AND nick = $3;`, vote.Voice, thread.ID, vote.Nick)
+	if rows.RowsAffected() == 0 {
+		_, err := tx.Exec(context.Background(), `INSERT INTO votes (nick, thread, vote) VALUES ($1, $2, $3);`, strings.ToLower(vote.Nick), thread.ID, vote.Voice)
 		if err != nil {
-			return err
-		}
-	} else {
-		queryNewVote := "insert into votes(nick, vote, thread) values ($1, $2, $3)"
-		_, err = conn.Exec(context.Background(),
-			queryNewVote,
-			vote.Nick,
-			userVoice,
-			thread.ID,
-		)
-		if err != nil {
-			return err
+			return models.UserNotFound
 		}
 	}
-
-	query := ""
-	if !userVoice {
-		query = fmt.Sprintf("update threads set votes = votes - %v ", diff)
-		thread.Votes -= diff
-	} else {
-		query = fmt.Sprintf("update threads set votes = votes + %v ", diff)
-		thread.Votes += diff
-	}
-
-	query += "where lower(slug) = $1 or id = $2"
-
-	_, err = conn.Exec(context.Background(),
-		query,
-		strings.ToLower(thread.Slug),
-		thread.ID,
-	)
+	err = tx.QueryRow(context.Background(), `SELECT votes FROM threads WHERE id = $1`, thread.ID).Scan(&thread.Votes)
 	if err != nil {
-		return fmt.Errorf("failed to update votes in thread: %v", err)
+		return err
 	}
+	tx.Commit(context.Background())
+
 	return nil
 }
 

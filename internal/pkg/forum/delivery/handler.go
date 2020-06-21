@@ -93,7 +93,7 @@ func (uh ForumHandler) GetForumUsers(w http.ResponseWriter, r *http.Request) {
 
 	limit, err := strconv.Atoi(r.URL.Query().Get("limit"))
 	if err != nil {
-		limit = 0
+		limit = 1
 	}
 
 	since := r.URL.Query().Get("since")
@@ -107,9 +107,14 @@ func (uh ForumHandler) GetForumUsers(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 
-	if err == models.ForumNotFound {
+	if err != nil {
 		log.Print(err)
-		w.WriteHeader(http.StatusNotFound)
+		if err == models.ForumNotFound {
+			w.WriteHeader(http.StatusNotFound)
+			helpers.EncodeAndSend(models.Message{Msg: err.Error()}, w)
+			return
+		}
+		w.WriteHeader(http.StatusInternalServerError)
 		helpers.EncodeAndSend(models.Message{Msg: err.Error()}, w)
 		return
 	}

@@ -6,7 +6,6 @@ import (
 	"techpark_db/internal/pkg/models"
 	"techpark_db/internal/pkg/thread"
 	"techpark_db/internal/pkg/user"
-	"time"
 )
 
 type ThreadUC struct {
@@ -53,7 +52,7 @@ func (uc ThreadUC) Create(thread *models.Thread) error {
 	return nil
 }
 
-func (uc ThreadUC) GetForumsThreads(forumSlug string, limit int, since time.Time, desc bool) ([]models.Thread, error) {
+func (uc ThreadUC) GetForumsThreads(forumSlug string, limit int, since string, desc bool) ([]models.Thread, error) {
 	dbForum, err := uc.ForumRepo.FindForumBySlug(forumSlug)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find forum by slug: %v", err)
@@ -70,7 +69,7 @@ func (uc ThreadUC) GetForumsThreads(forumSlug string, limit int, since time.Time
 func (uc ThreadUC) Vote(vote models.Vote, slug string, id int32) (*models.Thread, error) {
 	err := uc.UserRepo.GetUserNick(vote.Nick)
 	if err != nil {
-		return nil, err
+		return nil, models.UserNotFound
 	}
 	var dbThread *models.Thread
 	if id != -1 {
@@ -89,7 +88,13 @@ func (uc ThreadUC) Vote(vote models.Vote, slug string, id int32) (*models.Thread
 }
 
 func (uc ThreadUC) GetThread(slug string, id int32) (*models.Thread, error) {
-	dbThread, err := uc.ThreadRepo.FindBySlugOrID(slug, id)
+	var dbThread *models.Thread
+	var err error
+	if id != -1 {
+		dbThread, err = uc.ThreadRepo.FindThreadByID(id)
+	} else {
+		dbThread, err = uc.ThreadRepo.FindThreadBySlug(slug)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -100,7 +105,13 @@ func (uc ThreadUC) GetThread(slug string, id int32) (*models.Thread, error) {
 }
 
 func (uc ThreadUC) Update(id int32, slug, msg, title string) (*models.Thread, error) {
-	dbThread, err := uc.ThreadRepo.FindBySlugOrID(slug, id)
+	var dbThread *models.Thread
+	var err error
+	if id != -1 {
+		dbThread, err = uc.ThreadRepo.FindThreadByID(id)
+	} else {
+		dbThread, err = uc.ThreadRepo.FindThreadBySlug(slug)
+	}
 	if err != nil {
 		return nil, err
 	}

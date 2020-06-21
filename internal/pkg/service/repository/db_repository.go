@@ -49,7 +49,7 @@ func (db DBServiceRepository) Clear() error {
 	}
 	defer conn.Release()
 
-	query := "truncate table votes RESTART IDENTITY cascade;truncate table posts RESTART IDENTITY cascade ;truncate table forums RESTART IDENTITY cascade ;truncate table threads RESTART IDENTITY cascade ;truncate table users RESTART IDENTITY cascade ;"
+	query := "truncate table votes RESTART IDENTITY cascade;truncate table posts RESTART IDENTITY cascade ;truncate table forums RESTART IDENTITY cascade ;truncate table threads RESTART IDENTITY cascade ;truncate table users RESTART IDENTITY cascade;truncate table forum_users RESTART IDENTITY cascade;"
 
 	_, err = conn.Exec(context.Background(), query)
 	return err

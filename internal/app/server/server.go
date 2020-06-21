@@ -21,20 +21,20 @@ import (
 	userDelivery "techpark_db/internal/pkg/user/delivery"
 	userRepo "techpark_db/internal/pkg/user/repository"
 	userUC "techpark_db/internal/pkg/user/usecase"
-	"time"
 )
+
+func CheckReq(next http.Handler) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		//fmt.Printf(" Req URI:%s", r.RequestURI)
+		next.ServeHTTP(w, r)
+	}
+}
 
 func StartNew() {
 	m := mux.NewRouter()
 
-	server := http.Server{
-		Addr:         ":5000",
-		Handler:      m,
-		ReadTimeout:  10 * time.Second,
-		WriteTimeout: 10 * time.Second,
-	}
-
-	conn, err := pgxpool.Connect(context.Background(), "host=localhost port=5432 user=docker password=docker dbname=docker")
+	//conn, err := pgxpool.Connect(context.Background(), "host=localhost port=5432 user=docker password=docker dbname=docker")
+	conn, err := pgxpool.Connect(context.Background(), "host=localhost port=5432 user=postgres password=postgres dbname=db_forum")
 	//conn, err := pgxpool.Poolect(context.Background(), os.Getenv("DATABASE_URL"))
 	if err != nil {
 		log.Fatalf("failed to connecto to db: %v", err)
@@ -92,7 +92,7 @@ func StartNew() {
 
 	fmt.Println("starting server at :5000")
 
-	if err := server.ListenAndServe(); err != nil {
+	if err := http.ListenAndServe(":5000", CheckReq(m)); err != nil {
 		log.Fatal("failed to start server")
 	}
 }

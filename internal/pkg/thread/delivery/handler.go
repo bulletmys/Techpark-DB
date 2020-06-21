@@ -9,7 +9,6 @@ import (
 	"techpark_db/internal/pkg/helpers"
 	"techpark_db/internal/pkg/models"
 	"techpark_db/internal/pkg/thread"
-	"time"
 )
 
 type ThreadHandler struct {
@@ -80,7 +79,8 @@ func (uh ThreadHandler) GetThreadsByForum(w http.ResponseWriter, r *http.Request
 		limit = 0
 	}
 
-	since, err := time.Parse("2006-01-02T15:04:05.000Z", r.URL.Query().Get("since"))
+	//since, err := time.Parse("2006-01-02T15:04:05.000Z", r.URL.Query().Get("since"))
+	since :=  r.URL.Query().Get("since")
 
 	desc, err := strconv.ParseBool(r.URL.Query().Get("desc"))
 	if err != nil {

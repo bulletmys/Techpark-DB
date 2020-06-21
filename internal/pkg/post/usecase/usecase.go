@@ -26,7 +26,7 @@ func (uc PostUC) Create(posts []*models.Post, slug string, id int32) error {
 		return nil
 	}
 
-	created := time.Now()
+	created := time.Now().Truncate(time.Microsecond)
 
 	for _, elem := range posts {
 		elem.Thread = threadID
@@ -49,7 +49,13 @@ func (uc PostUC) Create(posts []*models.Post, slug string, id int32) error {
 }
 
 func (uc PostUC) Find(slug string, threadId, limit int32, since int64, desc bool, sortType post.SortType) ([]models.Post, error) {
-	dbThread, err := uc.ThreadRepo.FindBySlugOrID(slug, threadId)
+	var dbThread *models.Thread
+	var err error
+	if threadId != -1 {
+		dbThread, err = uc.ThreadRepo.FindThreadByID(threadId)
+	} else {
+		dbThread, err = uc.ThreadRepo.FindThreadBySlug(slug)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -61,18 +67,31 @@ func (uc PostUC) Find(slug string, threadId, limit int32, since int64, desc bool
 
 	switch sortType {
 	case post.FLAT:
-		posts, err = uc.PostRepo.FindPostsFlat(dbThread.ID, limit, since, desc, false)
+		posts, err = uc.PostRepo.FindPostsAlternative2(dbThread.ID, limit, since, desc, "flat")
 	case post.TREE:
-		posts, err = uc.PostRepo.FindPostsFlat(dbThread.ID, limit, since, desc, true)
+		posts, err = uc.PostRepo.FindPostsAlternative2(dbThread.ID, limit, since, desc, "tree")
 	case post.PARENT_TREE:
-		posts, err = uc.PostRepo.FindPostsParentTree(dbThread.ID, limit, since, desc)
+		posts, err = uc.PostRepo.FindPostsAlternative2(dbThread.ID, limit, since, desc, "parent_tree")
 	default:
-		posts, err = uc.PostRepo.FindPosts(dbThread.ID, limit, since, desc)
+		posts, err = uc.PostRepo.FindPostsAlternative2(dbThread.ID, limit, since, desc, "flat")
 	}
-
+	//
+	//if err != nil {
+	//	return nil, err
+	//}
 	if err != nil {
 		return nil, err
 	}
+
+	//for i, _ := range posts {
+	//	posts[i].Thread = dbThread.ID
+	//	user, err := uc.UserRepo.FindUserByNickname(posts[i].Author)
+	//	if err != nil {
+	//		return nil, err
+	//	}
+	//	posts[i].Author = user.Nickname
+	//	posts[i].Forum = dbThread.Forum
+	//}
 	return posts, nil
 }
 
@@ -130,7 +149,7 @@ func (uc PostUC) Update(id int64, msg string) (*models.Post, error) {
 	if dbPost == nil {
 		return nil, models.PostNotFound
 	}
-	if msg != "" && msg != dbPost.Message{
+	if msg != "" && msg != dbPost.Message {
 		dbPost.Message = msg
 		dbPost.IsEdited = true
 		err = uc.PostRepo.UpdatePost(id, msg)

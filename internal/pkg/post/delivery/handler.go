@@ -2,7 +2,6 @@ package delivery
 
 import (
 	"encoding/json"
-	"fmt"
 	"github.com/gorilla/mux"
 	"log"
 	"net/http"
@@ -88,12 +87,12 @@ func (uh PostHandler) Find(w http.ResponseWriter, r *http.Request) {
 
 	limit, err := strconv.Atoi(r.URL.Query().Get("limit"))
 	if err != nil {
-		limit = 0
+		limit = -1
 	}
 
 	since, err := strconv.ParseInt(r.URL.Query().Get("since"), 10, 64)
 	if err != nil {
-		since = 0
+		since = -1
 	}
 
 	desc, err := strconv.ParseBool(r.URL.Query().Get("desc"))
@@ -113,7 +112,7 @@ func (uh PostHandler) Find(w http.ResponseWriter, r *http.Request) {
 	case string(post.PARENT_TREE):
 		sortType = post.PARENT_TREE
 	default:
-		sortType = post.DEFAULT
+		sortType = post.FLAT
 	}
 
 	posts, err := uh.PostUC.Find(slugOrID, int32(threadID), int32(limit), since, desc, sortType)
@@ -166,7 +165,6 @@ func (uh PostHandler) GetDetails(w http.ResponseWriter, r *http.Request) {
 	}
 
 	for _, elem := range related {
-		fmt.Println(elem)
 		switch elem {
 		case "user":
 			userFlag = true

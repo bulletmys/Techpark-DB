@@ -157,49 +157,50 @@ func (db DBRepository) UpdateUser(user models.User) error {
 
 	return err
 }
-//
-//const (
-//	getForumUsersSinceSQl = `
-//		SELECT forum_user, fullname, about, email
-//		FROM forum_users
-//		WHERE forum = $1
-//		AND LOWER(forum_user) > LOWER($2::TEXT)
-//		ORDER BY forum_user
-//		LIMIT $3
-//	`
-//	getForumUsersDescSinceSQl = `
-//		SELECT forum_user, fullname, about, email
-//		FROM forum_users
-//		WHERE forum = $1
-//		AND LOWER(forum_user) < LOWER($2::TEXT)
-//		ORDER BY forum_user DESC
-//		LIMIT $3
-//	`
-//	getForumUsersSQl = `
-//		SELECT forum_user, fullname, about, email
-//		FROM forum_users
-//		WHERE forum = $1
-//		ORDER BY forum_user
-//		LIMIT $2
-//	`
-//	getForumUsersDescSQl = `
-//		SELECT forum_user, fullname, about, email
-//		FROM forum_users
-//		WHERE forum = $1
-//		ORDER BY forum_user DESC
-//		LIMIT $2
-//	`
-//)
-//
-//var queryForumUserWithSince = map[string]string{
-//	"true":  getForumUsersDescSinceSQl,
-//	"false": getForumUsersSinceSQl,
-//}
-//
-//var queryForumUserNoSince = map[string]string{
-//	"true":  getForumUsersDescSQl,
-//	"false": getForumUsersSQl,
-//}
+
+const (
+	getForumUsersSinceSQl = `
+		SELECT forum_user, fullname, about, email
+		FROM forum_users
+		WHERE forum = $1
+		AND LOWER(forum_user) > LOWER($2::TEXT)
+		ORDER BY forum_user
+		LIMIT $3
+	`
+	getForumUsersDescSinceSQl = `
+		SELECT forum_user, fullname, about, email
+		FROM forum_users
+		WHERE forum = $1
+		AND LOWER(forum_user) < LOWER($2::TEXT)
+		ORDER BY forum_user DESC
+		LIMIT $3
+	`
+	getForumUsersSQl = `
+		SELECT forum_user, fullname, about, email
+		FROM forum_users
+		WHERE forum = $1
+		ORDER BY forum_user
+		LIMIT $2
+	`
+	getForumUsersDescSQl = `
+		SELECT forum_user, fullname, about, email
+		FROM forum_users
+		WHERE forum = $1
+		ORDER BY forum_user DESC
+		LIMIT $2
+	`
+
+)
+
+var queryForumUserWithSince = map[string]string{
+	"true":  getForumUsersDescSinceSQl,
+	"false": getForumUsersSinceSQl,
+}
+
+var queryForumUserNoSince = map[string]string{
+	"true":  getForumUsersDescSQl,
+	"false": getForumUsersSQl,
+}
 
 func (db DBRepository) GetForumUsersDB(slug, since string, limit int, desc bool) ([]models.User, error) {
 	conn, err := db.Conn.Acquire(context.Background())
@@ -210,31 +211,12 @@ func (db DBRepository) GetForumUsersDB(slug, since string, limit int, desc bool)
 
 	var rows pgx.Rows
 
-	var query strings.Builder
-	query.WriteString(`SELECT forum_user, fullname, about, email
-		FROM forum_users
-		WHERE forum = $1`)
-
 	if since != "" {
-		if desc {
-			query.WriteString(` AND LOWER(forum_user) < $2
-		ORDER BY forum_user DESC
-		LIMIT $3`)
-		} else {
-			query.WriteString(` AND LOWER(forum_user) > $2
-		ORDER BY forum_user
-		LIMIT $3`)
-		}
-		rows, err = conn.Query(context.Background(), query.String(), slug, strings.ToLower(since), limit)
+		query := queryForumUserWithSince[fmt.Sprint(desc)]
+		rows, err = conn.Query(context.Background(), query, slug, since, limit)
 	} else {
-		if desc {
-			query.WriteString(` ORDER BY forum_user
-		LIMIT $2`)
-		} else {
-			query.WriteString(` ORDER BY forum_user desc
-		LIMIT $2`)
-		}
-		rows, err = conn.Query(context.Background(), query.String(), slug, limit)
+		query := queryForumUserNoSince[fmt.Sprint(desc)]
+		rows, err = conn.Query(context.Background(), query, slug, limit)
 	}
 	defer rows.Close()
 
@@ -257,6 +239,7 @@ func (db DBRepository) GetForumUsersDB(slug, since string, limit int, desc bool)
 
 	return users, nil
 }
+
 
 func (db DBRepository) GetForumUsers(slug, since string, limit int, desc bool) ([]models.User, error) {
 	conn, err := db.Conn.Acquire(context.Background())

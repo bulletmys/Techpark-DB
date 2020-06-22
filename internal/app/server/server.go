@@ -23,19 +23,11 @@ import (
 	userUC "techpark_db/internal/pkg/user/usecase"
 )
 
-func CheckReq(next http.Handler) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		//fmt.Printf(" Req URI:%s", r.RequestURI)
-		next.ServeHTTP(w, r)
-	}
-}
-
 func StartNew() {
 	m := mux.NewRouter()
 
-	//conn, err := pgxpool.Connect(context.Background(), "host=localhost port=5432 user=docker password=docker dbname=docker")
-	conn, err := pgxpool.Connect(context.Background(), "host=localhost port=5432 user=postgres password=postgres dbname=db_forum")
-	//conn, err := pgxpool.Poolect(context.Background(), os.Getenv("DATABASE_URL"))
+	conn, err := pgxpool.Connect(context.Background(), "host=localhost port=5432 user=docker password=docker dbname=docker")
+	//conn, err := pgxpool.Connect(context.Background(), "host=localhost port=5432 user=postgres password=postgres dbname=db_forum")
 	if err != nil {
 		log.Fatalf("failed to connecto to db: %v", err)
 	}
@@ -92,7 +84,7 @@ func StartNew() {
 
 	fmt.Println("starting server at :5000")
 
-	if err := http.ListenAndServe(":5000", CheckReq(m)); err != nil {
+	if err := http.ListenAndServe(":5000", m); err != nil {
 		log.Fatal("failed to start server")
 	}
 }

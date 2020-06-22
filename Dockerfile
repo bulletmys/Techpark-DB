@@ -11,7 +11,7 @@ RUN go build main.go
 # Postgres
 FROM ubuntu:18.04 AS release
 ENV DEBIAN_FRONTEND=noninteractive
-ENV PGVER 11
+ENV PGVER 12
 
 RUN apt-get update && apt-get install -y wget gnupg && \
     wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | apt-key add -
@@ -32,8 +32,8 @@ RUN /etc/init.d/postgresql start &&\
 
 RUN echo "local all all md5" > /etc/postgresql/$PGVER/main/pg_hba.conf && \
     echo "host all all 0.0.0.0/0 md5" >> /etc/postgresql/$PGVER/main/pg_hba.conf
+RUN cat sql/postgres_config.conf >> /etc/postgresql/$PGVER/main/postgresql.conf
 
-RUN cat sql/postgresql.conf >> /etc/postgresql/$PGVER/main/postgresql.conf
 EXPOSE 5432
 VOLUME  ["/etc/postgresql", "/var/log/postgresql", "/var/lib/postgresql"]
 USER root

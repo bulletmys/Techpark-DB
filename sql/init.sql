@@ -1,7 +1,7 @@
 create extension if not exists citext;
 CREATE UNLOGGED TABLE users
 (
-    nick  CITEXT /*COLLATE ucs_basic*/ PRIMARY KEY,
+    nick  CITEXT PRIMARY KEY,
     email CITEXT UNIQUE,
     name  CITEXT NOT NULL,
     about VARCHAR
@@ -216,7 +216,7 @@ CREATE OR REPLACE FUNCTION update_vote() RETURNS TRIGGER AS
 $update_vote$
 BEGIN
     UPDATE threads
-    SET votes = votes - OLD.vote + NEW.vote
+    SET votes = votes + NEW.vote - OLD.vote
     WHERE id = NEW.thread;
     RETURN NEW;
 END;
@@ -231,17 +231,18 @@ EXECUTE PROCEDURE update_vote();
 
 CREATE UNLOGGED TABLE forum_users
 (
-    forum_user CITEXT COLLATE ucs_basic NOT NULL,
-    forum      CITEXT                   NOT NULL,
-    email      TEXT                     NOT NULL,
-    fullname   TEXT                     NOT NULL,
-    about      TEXT
+    nick  CITEXT COLLATE ucs_basic NOT NULL,
+    email TEXT                     NOT NULL,
+    name  TEXT                     NOT NULL,
+    about TEXT,
+    forum CITEXT                   NOT NULL
+
 );
 
 CREATE OR REPLACE FUNCTION add_forum_user() RETURNS TRIGGER AS
 $add_forum_user$
 BEGIN
-    INSERT INTO forum_users (forum_user, forum, email, fullname, about)
+    INSERT INTO forum_users (nick, forum, email, name, about)
     SELECT nick, NEW.forum, email, name, about
     FROM users
     WHERE nick = NEW.nick
@@ -250,7 +251,6 @@ BEGIN
 END;
 $add_forum_user$
     LANGUAGE plpgsql;
-
 
 CREATE TRIGGER add_forum_user
     AFTER INSERT
@@ -261,7 +261,7 @@ EXECUTE PROCEDURE add_forum_user();
 CREATE OR REPLACE FUNCTION add_forum_user_p() RETURNS TRIGGER AS
 $add_forum_user_p$
 BEGIN
-    INSERT INTO forum_users (forum_user, forum, email, fullname, about)
+    INSERT INTO forum_users (nick, forum, email, name, about)
     SELECT nick, NEW.forum, email, name, about
     FROM users
     WHERE nick = NEW.nick
@@ -279,8 +279,8 @@ CREATE TRIGGER add_forum_user_p
 EXECUTE PROCEDURE add_forum_user_p();
 
 
-CREATE UNIQUE INDEX IF NOT EXISTS idx_fu_user ON forum_users (forum, forum_user);
-CREATE UNIQUE INDEX IF NOT EXISTS idx_forum_slug  ON forums (slug);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_fu_user ON forum_users (forum, nick);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_forum_slug ON forums (slug);
 
 CREATE INDEX IF NOT EXISTS idx_threads_slug ON threads (slug);
 CREATE INDEX IF NOT EXISTS idx_threads_forum ON threads (forum);

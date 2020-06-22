@@ -67,31 +67,19 @@ func (uc PostUC) Find(slug string, threadId, limit int32, since int64, desc bool
 
 	switch sortType {
 	case post.FLAT:
-		posts, err = uc.PostRepo.FindPostsAlternative2(dbThread.ID, limit, since, desc, "flat")
+		posts, err = uc.PostRepo.FindPostsFlatSort(dbThread.ID, limit, since, desc)
 	case post.TREE:
-		posts, err = uc.PostRepo.FindPostsAlternative2(dbThread.ID, limit, since, desc, "tree")
+		posts, err = uc.PostRepo.FindPostsTreeSort(dbThread.ID, limit, since, desc)
 	case post.PARENT_TREE:
-		posts, err = uc.PostRepo.FindPostsAlternative2(dbThread.ID, limit, since, desc, "parent_tree")
+		posts, err = uc.PostRepo.FindPostsParentTreeSort(dbThread.ID, limit, since, desc)
 	default:
-		posts, err = uc.PostRepo.FindPostsAlternative2(dbThread.ID, limit, since, desc, "flat")
+		posts, err = uc.PostRepo.FindPostsFlatSort(dbThread.ID, limit, since, desc)
 	}
-	//
-	//if err != nil {
-	//	return nil, err
-	//}
+
 	if err != nil {
 		return nil, err
 	}
 
-	//for i, _ := range posts {
-	//	posts[i].Thread = dbThread.ID
-	//	user, err := uc.UserRepo.FindUserByNickname(posts[i].Author)
-	//	if err != nil {
-	//		return nil, err
-	//	}
-	//	posts[i].Author = user.Nickname
-	//	posts[i].Forum = dbThread.Forum
-	//}
 	return posts, nil
 }
 

@@ -6,8 +6,8 @@ import (
 	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
 	"strconv"
+	"strings"
 	"techpark_db/internal/pkg/models"
-	"techpark_db/internal/pkg/post"
 )
 
 type DBRepository struct {
@@ -71,163 +71,59 @@ func (db DBRepository) FindPostsByID(posts []*models.Post) error {
 	return nil
 }
 
-const (
-	// getThreadPosts
-	getPostsSienceDescLimitTreeSQL = `
-		SELECT id, nick, parent, message, forum, thread, created
-		FROM posts
-		WHERE thread = $1 AND (path < (SELECT path FROM posts WHERE id = $2))
-		ORDER BY path DESC
-		LIMIT $3
-	`
-
-	getPostsSienceDescLimitParentTreeSQL = `
-		SELECT id, nick, parent, message, forum, thread, created
-		FROM posts p
-		WHERE p.thread = $1 and p.path[1] IN (
-			SELECT p2.path[1]
-			FROM posts p2
-			WHERE p2.thread = $1 AND p2.parent = 0 and p2.path[1] < (SELECT p3.path[1] from posts p3 where p3.id = $2)
-			ORDER BY p2.path DESC
-			LIMIT $3
-		)
-		ORDER BY p.path[1] DESC, p.path[2:]
-	`
-
-	getPostsSienceDescLimitFlatSQL = `
-		SELECT id, nick, parent, message, forum, thread, created
-		FROM posts
-		WHERE thread = $1 AND id < $2
-		ORDER BY id DESC
-		LIMIT $3
-	`
-
-	getPostsSienceLimitTreeSQL = `
-		SELECT id, nick, parent, message, forum, thread, created
-		FROM posts
-		WHERE thread = $1 AND (path > (SELECT path FROM posts WHERE id = $2))
-		ORDER BY path
-		LIMIT $3
-	`
-
-	getPostsSienceLimitParentTreeSQL = `
-		SELECT id, nick, parent, message, forum, thread, created
-		FROM posts p
-		WHERE p.thread = $1 and p.path[1] IN (
-			SELECT p2.path[1]
-			FROM posts p2
-			WHERE p2.thread = $1 AND p2.parent = 0 and p2.path[1] > (SELECT p3.path[1] from posts p3 where p3.id = $2)
-			ORDER BY p2.path
-			LIMIT $3
-		)
-		ORDER BY p.path
-	`
-	getPostsSienceLimitFlatSQL = `
-		SELECT id, nick, parent, message, forum, thread, created
-		FROM posts
-		WHERE thread = $1 AND id > $2
-		ORDER BY id
-		LIMIT $3
-	`
-	// without sience
-	getPostsDescLimitTreeSQL = `
-		SELECT id, nick, parent, message, forum, thread, created
-		FROM posts
-		WHERE thread = $1 
-		ORDER BY path DESC
-		LIMIT $2
-	`
-	getPostsDescLimitParentTreeSQL = `
-		SELECT id, nick, parent, message, forum, thread, created
-		FROM posts
-		WHERE thread = $1 AND path[1] IN (
-			SELECT path[1]
-			FROM posts
-			WHERE thread = $1
-			GROUP BY path[1]
-			ORDER BY path[1] DESC
-			LIMIT $2
-		)
-		ORDER BY path[1] DESC, path
-	`
-	getPostsDescLimitFlatSQL = `
-		SELECT id, nick, parent, message, forum, thread, created
-		FROM posts
-		WHERE thread = $1
-		ORDER BY id DESC
-		LIMIT $2
-	`
-	getPostsLimitTreeSQL = `
-		SELECT id, nick, parent, message, forum, thread, created
-		FROM posts
-		WHERE thread = $1 
-		ORDER BY path
-		LIMIT $2
-	`
-	getPostsLimitParentTreeSQL = `
-		SELECT id, nick, parent, message, forum, thread, created
-		FROM posts
-		WHERE thread = $1 AND path[1] IN (
-			SELECT path[1] 
-			FROM posts 
-			WHERE thread = $1 
-			GROUP BY path[1]
-			ORDER BY path[1]
-			LIMIT $2
-		)
-		ORDER BY path
-	`
-	getPostsLimitFlatSQL = `
-		SELECT id, nick, parent, message, forum, thread, created
-		FROM posts
-		WHERE thread = $1 
-		ORDER BY id
-		LIMIT $2
-	`
-)
-
-var queryPostsWithSience = map[string]map[string]string{
-	"true": map[string]string{
-		"tree":        getPostsSienceDescLimitTreeSQL,
-		"parent_tree": getPostsSienceDescLimitParentTreeSQL,
-		"flat":        getPostsSienceDescLimitFlatSQL,
-	},
-	"false": map[string]string{
-		"tree":        getPostsSienceLimitTreeSQL,
-		"parent_tree": getPostsSienceLimitParentTreeSQL,
-		"flat":        getPostsSienceLimitFlatSQL,
-	},
-}
-
-var queryPostsNoSience = map[string]map[string]string{
-	"true": map[string]string{
-		"tree":        getPostsDescLimitTreeSQL,
-		"parent_tree": getPostsDescLimitParentTreeSQL,
-		"flat":        getPostsDescLimitFlatSQL,
-	},
-	"false": map[string]string{
-		"tree":        getPostsLimitTreeSQL,
-		"parent_tree": getPostsLimitParentTreeSQL,
-		"flat":        getPostsLimitFlatSQL,
-	},
-}
-
-func (db DBRepository) FindPostsAlternative2(threadID, limit int32, since int64, desc bool, sortType string) ([]models.Post, error) {
+func (db DBRepository) FindPostsParentTreeSort(threadID, limit int32, since int64, desc bool) ([]models.Post, error) {
 	conn, err := db.Conn.Acquire(context.Background())
 	if err != nil {
 		return nil, fmt.Errorf("failed to acquire conn: %v", err)
 	}
 	defer conn.Release()
+	args := make([]interface{}, 1, 3)
+	args[0] = threadID
 
 	var rows pgx.Rows
+	var query strings.Builder
+	query.WriteString(`SELECT id, nick, parent, message, forum, thread, created
+		FROM posts p `)
 
 	if since != -1 {
-		query := queryPostsWithSience[fmt.Sprint(desc)][sortType]
-		rows, err = conn.Query(context.Background(), query, threadID, since, limit)
+		query.WriteString(`WHERE p.thread = $1 and p.path[1] IN (
+			SELECT p2.path[1]
+			FROM posts p2
+			WHERE p2.thread = $1 AND p2.parent = 0 and p2.path[1] `)
+		if desc {
+			query.WriteString(`< (SELECT p3.path[1] from posts p3 where p3.id = $2)
+			ORDER BY p2.path DESC
+			LIMIT $3
+		)
+		ORDER BY p.path[1] DESC, p.path[2:]`)
+		} else {
+			query.WriteString(`>  (SELECT p3.path[1] from posts p3 where p3.id = $2)
+			ORDER BY p2.path
+			LIMIT $3
+		)
+		ORDER BY p.path`)
+		}
+		args = append(args, since)
 	} else {
-		query := queryPostsNoSience[fmt.Sprint(desc)][sortType]
-		rows, err = conn.Query(context.Background(), query, threadID, limit)
+		query.WriteString(`WHERE thread = $1 AND path[1] IN (
+			SELECT path[1] 
+			FROM posts 
+			WHERE thread = $1 
+			GROUP BY path[1]`)
+		if desc {
+			query.WriteString(` ORDER BY path[1] DESC
+			LIMIT $2
+		)
+		ORDER BY path[1] DESC, path`)
+		} else {
+			query.WriteString(` ORDER BY path[1]
+			LIMIT $2
+		)
+		ORDER BY path`)
+		}
 	}
+	args = append(args, limit)
+	rows, err = conn.Query(context.Background(), query.String(), args...)
 	defer rows.Close()
 
 	if err != nil {
@@ -257,149 +153,138 @@ func (db DBRepository) FindPostsAlternative2(threadID, limit int32, since int64,
 		return nil, err
 	}
 	return posts, nil
-
 }
 
-func (db DBRepository) FindPostsAlternative(threadID, limit int32, since int64, desc bool, sortType post.SortType) ([]models.Post, error) {
+func (db DBRepository) FindPostsFlatSort(threadID, limit int32, since int64, desc bool) ([]models.Post, error) {
 	conn, err := db.Conn.Acquire(context.Background())
 	if err != nil {
 		return nil, fmt.Errorf("failed to acquire conn: %v", err)
 	}
 	defer conn.Release()
 
-	posts := make([]models.Post, 0)
+	args := make([]interface{}, 1, 3)
+	args[0] = threadID
 
-	var curParams []interface{}
-	selectStr := ""
+	var rows pgx.Rows
+	var query strings.Builder
+	query.WriteString(`SELECT id, nick, parent, message, forum, thread, created
+		FROM posts
+		WHERE thread = $1 `)
 
-	switch sortType {
-	case post.FLAT:
-		curParams = append(curParams, threadID)
-		selectStr += `SELECT p.id, p.created, p.forum, 
-				p.message, p.parent, p.nick, p.thread FROM posts p WHERE p.thread = $1`
-		if since != -1 {
-			curParams = append(curParams, since)
-			selectStr += ` AND (p.created, p.id) `
-			if desc {
-				selectStr += "<"
-			} else {
-				selectStr += ">"
-			}
-			selectStr += ` (SELECT posts.created, posts.id FROM posts WHERE posts.id=$2)`
-		}
-		selectStr += ` ORDER BY (p.created, p.id)`
+	if since != -1 {
 		if desc {
-			selectStr += " DESC"
+			query.WriteString(`AND id < $2
+		ORDER BY id DESC
+		LIMIT $3`)
+		} else {
+			query.WriteString(`AND id > $2
+		ORDER BY id
+		LIMIT $3`)
 		}
-		if limit != -1 {
-			selectStr += " LIMIT $"
-			selectStr += strconv.Itoa(len(curParams) + 1)
-			curParams = append(curParams, limit)
-		}
-	case post.TREE:
-		curParams = append(curParams, threadID)
-		selectStr += `SELECT p.id, p.created, p.forum, 
-				p.message, p.parent, p.nick, p.thread FROM posts p WHERE p.thread = $1`
-		if since != -1 {
-			curParams = append(curParams, since)
-			selectStr += " AND p.path "
-			if desc {
-				selectStr += "<"
-			} else {
-				selectStr += ">"
-			}
-			selectStr += ` (SELECT posts.path FROM posts WHERE posts.id = $2)`
-		}
-		selectStr += " ORDER BY p.path"
+		args = append(args, since)
+	} else {
 		if desc {
-			selectStr += " DESC"
+			query.WriteString(` ORDER BY id DESC
+		LIMIT $2`)
+		} else {
+			query.WriteString(` ORDER BY id
+		LIMIT $2`)
 		}
-		if limit != -1 {
-			selectStr += " LIMIT $"
-			selectStr += strconv.Itoa(len(curParams) + 1)
-			curParams = append(curParams, limit)
-		}
-	case post.PARENT_TREE:
-		curParams = append(curParams, threadID)
-		selectStr += `SELECT p.id, p.created, p.forum, 
-				p.message, p.parent, p.nick, p.thread FROM posts p WHERE p.path[1] IN (
-				SELECT posts.id FROM posts WHERE posts.thread = $1 AND posts.parent = 0`
-		if since != -1 {
-			curParams = append(curParams, since)
-			selectStr += ` AND posts.id `
-			if desc {
-				selectStr += "<"
-			} else {
-				selectStr += ">"
-			}
-			selectStr += ` (SELECT COALESCE(posts.path[1], posts.id) FROM posts WHERE posts.id = $2)`
-		}
-		selectStr += " ORDER BY posts.id"
-		if desc {
-			selectStr += " DESC"
-		}
-		if limit != -1 {
-			selectStr += " LIMIT $"
-			selectStr += strconv.Itoa(len(curParams) + 1)
-			curParams = append(curParams, limit)
-		}
-		selectStr += `) ORDER BY`
-		if desc {
-			selectStr += ` p.path[1] DESC,`
-		}
-		selectStr += ` p.path`
 	}
-	selectStr += ";"
+	args = append(args, limit)
+	rows, err = conn.Query(context.Background(), query.String(), args...)
+	defer rows.Close()
 
-	fmt.Println("НЕ ЖОПА", selectStr, curParams)
-
-	rows, err := conn.Query(context.Background(), selectStr, curParams...)
 	if err != nil {
-		fmt.Println("ЖОПА", selectStr, curParams)
-		return posts, fmt.Errorf("JOPA: %w", err)
+		return nil, err
 	}
 
+	posts := make([]models.Post, 0)
 	for rows.Next() {
 		post := models.Post{}
-		err := rows.Scan(&post.ID, &post.Created, &post.Forum,
-			&post.Message, &post.Parent, &post.Author, &post.Thread)
+
+		err = rows.Scan(
+			&post.ID,
+			&post.Author,
+			&post.Parent,
+			&post.Message,
+			&post.Forum,
+			&post.Thread,
+			&post.Created,
+		)
 		if err != nil {
-			return posts, fmt.Errorf("JOPA2: %w", err)
+			return nil, err
 		}
 		posts = append(posts, post)
 	}
 
-	rows.Close()
-
-	fmt.Println("ВЫВОД", posts)
-
 	return posts, nil
 }
 
-func configParentTreeQuery(limit int, since int64, desc bool, flag *bool) string {
-	query := "select nick, created, forum, id, message, thread, parent from posts where thread = $1 and path[1] = id"
+func (db DBRepository) FindPostsTreeSort(threadID, limit int32, since int64, desc bool) ([]models.Post, error) {
+	conn, err := db.Conn.Acquire(context.Background())
+	if err != nil {
+		return nil, fmt.Errorf("failed to acquire conn: %v", err)
+	}
+	defer conn.Release()
 
-	if since > 0 {
-		*flag = true
+	args := make([]interface{}, 1, 3)
+	args[0] = threadID
+
+	var rows pgx.Rows
+	var query strings.Builder
+	query.WriteString(`SELECT id, nick, parent, message, forum, thread, created
+		FROM posts
+		WHERE thread = $1 `)
+
+	if since != -1 {
 		if desc {
-			query += " and id < $2"
+			query.WriteString(`AND (path < (SELECT path FROM posts WHERE id = $2))
+		ORDER BY path DESC
+		LIMIT $3`)
 		} else {
-			query += " and id > $2"
+			query.WriteString(`AND (path > (SELECT path FROM posts WHERE id = $2))
+		ORDER BY path
+		LIMIT $3`)
+		}
+		args = append(args, since)
+	} else {
+		if desc {
+			query.WriteString(` ORDER BY path DESC
+		LIMIT $2`)
+		} else {
+			query.WriteString(` ORDER BY path
+		LIMIT $2`)
 		}
 	}
+	args = append(args, limit)
+	rows, err = conn.Query(context.Background(), query.String(), args...)
+	defer rows.Close()
 
-	query += " order by path"
-
-	if desc {
-		query += " desc"
+	if err != nil {
+		return nil, err
 	}
 
-	query += ", id"
+	posts := make([]models.Post, 0)
+	for rows.Next() {
+		post := models.Post{}
 
-	if limit > 0 {
-		query += " limit " + strconv.Itoa(int(limit))
+		err = rows.Scan(
+			&post.ID,
+			&post.Author,
+			&post.Parent,
+			&post.Message,
+			&post.Forum,
+			&post.Thread,
+			&post.Created,
+		)
+		if err != nil {
+			return nil, err
+		}
+		posts = append(posts, post)
 	}
-	return query
+
+	return posts, nil
 }
 
 func (db DBRepository) FindPostsParentTree(thread, limit int32, since int64, desc bool) ([]models.Post, error) {
@@ -682,7 +567,7 @@ func (db DBRepository) UpdatePost(id int64, msg string) error {
 		msg,
 	)
 	if err != nil {
-		return  fmt.Errorf("failed to update post: %v", err)
+		return fmt.Errorf("failed to update post: %v", err)
 	}
 
 	return nil

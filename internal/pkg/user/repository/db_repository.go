@@ -158,49 +158,6 @@ func (db DBRepository) UpdateUser(user models.User) error {
 	return err
 }
 
-const (
-	getForumUsersSinceSQl = `
-		SELECT forum_user, fullname, about, email
-		FROM forum_users
-		WHERE forum = $1
-		AND LOWER(forum_user) > LOWER($2::TEXT)
-		ORDER BY forum_user
-		LIMIT $3
-	`
-	getForumUsersDescSinceSQl = `
-		SELECT forum_user, fullname, about, email
-		FROM forum_users
-		WHERE forum = $1
-		AND LOWER(forum_user) < LOWER($2::TEXT)
-		ORDER BY forum_user DESC
-		LIMIT $3
-	`
-	getForumUsersSQl = `
-		SELECT forum_user, fullname, about, email
-		FROM forum_users
-		WHERE forum = $1
-		ORDER BY forum_user
-		LIMIT $2
-	`
-	getForumUsersDescSQl = `
-		SELECT forum_user, fullname, about, email
-		FROM forum_users
-		WHERE forum = $1
-		ORDER BY forum_user DESC
-		LIMIT $2
-	`
-)
-
-var queryForumUserWithSince = map[string]string{
-	"true":  getForumUsersDescSinceSQl,
-	"false": getForumUsersSinceSQl,
-}
-
-var queryForumUserNoSince = map[string]string{
-	"true":  getForumUsersDescSQl,
-	"false": getForumUsersSQl,
-}
-
 func (db DBRepository) GetForumUsersDB(slug, since string, limit int, desc bool) ([]models.User, error) {
 	conn, err := db.Conn.Acquire(context.Background())
 	if err != nil {
@@ -209,33 +166,32 @@ func (db DBRepository) GetForumUsersDB(slug, since string, limit int, desc bool)
 	defer conn.Release()
 
 	var rows pgx.Rows
-	args := make([]interface{}, 1, 2)
-
+	args := make([]interface{}, 1, 3)
 	args[0] = slug
 
 	var query strings.Builder
-	query.WriteString(`SELECT forum_user, fullname, about, email
+	query.WriteString(`SELECT nick, name, about, email
 		FROM forum_users
 		WHERE forum = $1`)
 
 	if since != "" {
 		if desc {
-			query.WriteString(` and LOWER(forum_user) < $2
-		ORDER BY forum_user DESC
+			query.WriteString(` and LOWER(nick) < $2
+		ORDER BY nick DESC
 		LIMIT $3`)
 		} else {
-			query.WriteString(` and LOWER(forum_user) > $2
-		ORDER BY forum_user
+			query.WriteString(` and LOWER(nick) > $2
+		ORDER BY nick
 		LIMIT $3`)
 		}
 		args = append(args, strings.ToLower(since))
 
 	} else {
 		if desc {
-			query.WriteString(` ORDER BY forum_user DESC
+			query.WriteString(` ORDER BY nick DESC
 		LIMIT $2`)
 		} else {
-			query.WriteString(` ORDER BY forum_user
+			query.WriteString(` ORDER BY nick
 		LIMIT $2`)
 		}
 	}

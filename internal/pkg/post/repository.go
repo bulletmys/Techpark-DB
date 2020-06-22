@@ -12,6 +12,7 @@ type Repository interface {
 	FindPosts(thread, limit int32, since int64, desc bool) ([]models.Post, error)
 	GetPost(id int64) (*models.Post, error)
 	UpdatePost(id int64, msg string) error
-	FindPostsAlternative(threadID, limit int32, since int64, desc bool, sortType SortType) ([]models.Post, error)
-	FindPostsAlternative2(threadID, limit int32, since int64, desc bool, sortType string) ([]models.Post, error)
+	FindPostsParentTreeSort(threadID, limit int32, since int64, desc bool) ([]models.Post, error)
+	FindPostsTreeSort(threadID, limit int32, since int64, desc bool) ([]models.Post, error)
+	FindPostsFlatSort(threadID, limit int32, since int64, desc bool) ([]models.Post, error)
 }

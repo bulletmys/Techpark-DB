@@ -189,7 +189,6 @@ const (
 		ORDER BY forum_user DESC
 		LIMIT $2
 	`
-
 )
 
 var queryForumUserWithSince = map[string]string{
@@ -210,14 +209,38 @@ func (db DBRepository) GetForumUsersDB(slug, since string, limit int, desc bool)
 	defer conn.Release()
 
 	var rows pgx.Rows
+	args := make([]interface{}, 1, 2)
+
+	args[0] = slug
+
+	var query strings.Builder
+	query.WriteString(`SELECT forum_user, fullname, about, email
+		FROM forum_users
+		WHERE forum = $1`)
 
 	if since != "" {
-		query := queryForumUserWithSince[fmt.Sprint(desc)]
-		rows, err = conn.Query(context.Background(), query, slug, since, limit)
+		if desc {
+			query.WriteString(` and LOWER(forum_user) < $2
+		ORDER BY forum_user DESC
+		LIMIT $3`)
+		} else {
+			query.WriteString(` and LOWER(forum_user) > $2
+		ORDER BY forum_user
+		LIMIT $3`)
+		}
+		args = append(args, strings.ToLower(since))
+
 	} else {
-		query := queryForumUserNoSince[fmt.Sprint(desc)]
-		rows, err = conn.Query(context.Background(), query, slug, limit)
+		if desc {
+			query.WriteString(` ORDER BY forum_user DESC
+		LIMIT $2`)
+		} else {
+			query.WriteString(` ORDER BY forum_user
+		LIMIT $2`)
+		}
 	}
+	args = append(args, limit)
+	rows, err = conn.Query(context.Background(), query.String(), args...)
 	defer rows.Close()
 
 	if err != nil {
@@ -239,7 +262,6 @@ func (db DBRepository) GetForumUsersDB(slug, since string, limit int, desc bool)
 
 	return users, nil
 }
-
 
 func (db DBRepository) GetForumUsers(slug, since string, limit int, desc bool) ([]models.User, error) {
 	conn, err := db.Conn.Acquire(context.Background())
